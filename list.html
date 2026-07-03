@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット一覧 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260703b">
+<link rel="stylesheet" href="assets/style.css?v=20260703c">
 </head>
 <body>
   <div class="app">
@@ -24,9 +24,10 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20260703b"></script>
-<script src="assets/data.js?v=20260703b"></script>
-<script src="assets/app.js?v=20260703b"></script>
+<script src="assets/config.js?v=20260703c"></script>
+<script src="assets/data.js?v=20260703c"></script>
+<script src="assets/maps.js?v=20260703c"></script>
+<script src="assets/app.js?v=20260703c"></script>
 <script>
   let activeCat = "all", q = "", places = [];
 
@@ -61,6 +62,7 @@
       a.innerHTML = placeCardHTML(p);
       cards.appendChild(a);
     });
+    hydrateCardPhotos(cards); // 写真の無い施設は Places API から後埋め
   }
   mountNav("list");
 </script>

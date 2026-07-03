@@ -35,9 +35,12 @@ const stars = n => "★★★★★☆☆☆☆☆".slice(5 - Math.round(n), 10 
 
 /* card markup shared by map / list / mypage */
 function placeCardHTML(p) {
-  const bg = p.cover ? `background-image:url('${p.cover}')` : "background:#ded9cf";
+  // 写真が無く placeId がある施設は、あとで Places API から写真を後埋めする
+  const needFetch = !p.cover && p.placeId;
+  const thumbStyle = p.cover ? `background-image:url('${p.cover}')` : "background-color:#ded9cf";
+  const fetchAttr = needFetch ? ` data-photo="${escapeHtml(p.placeId)}"` : "";
   return `
-    <div class="thumb" style="${bg}">
+    <div class="thumb"${fetchAttr} style="${thumbStyle}">
       <span class="badge">${catLabel(p.category)}</span>
       ${p.visibility === "private" ? `<span class="lock">🔒 非公開</span>` : ""}
     </div>
@@ -49,6 +52,19 @@ function placeCardHTML(p) {
         <span>${p.source === "user" ? "ユーザー登録" : "Google Map掲載"}</span>
       </div>
     </div>`;
+}
+
+/* 写真が無いカードに、Places API から取得した写真を後から差し込む */
+function hydrateCardPhotos(root) {
+  if (!(window.WCMap && WCMap.ready)) return;
+  WCMap.ready().then(() => {
+    if (!(WCMap.canSearch && WCMap.fetchPhoto)) return; // Google Maps モードのみ
+    $$('.thumb[data-photo]', root || document).forEach(el => {
+      const pid = el.getAttribute("data-photo");
+      el.removeAttribute("data-photo"); // 二重取得を防ぐ
+      WCMap.fetchPhoto(pid).then(url => { if (url) el.style.backgroundImage = `url('${url}')`; }).catch(() => {});
+    });
+  });
 }
 
 function escapeHtml(s) {

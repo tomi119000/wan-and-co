@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット詳細 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260703b">
+<link rel="stylesheet" href="assets/style.css?v=20260703c">
 </head>
 <body>
   <div class="app">
@@ -15,10 +15,10 @@
     <div id="content"></div>
   </div>
 
-<script src="assets/config.js?v=20260703b"></script>
-<script src="assets/data.js?v=20260703b"></script>
-<script src="assets/maps.js?v=20260703b"></script>
-<script src="assets/app.js?v=20260703b"></script>
+<script src="assets/config.js?v=20260703c"></script>
+<script src="assets/data.js?v=20260703c"></script>
+<script src="assets/maps.js?v=20260703c"></script>
+<script src="assets/app.js?v=20260703c"></script>
 <script>
   const id = new URLSearchParams(location.search).get("id");
 
@@ -45,7 +45,7 @@
     $("#src").textContent = p.source === "user" ? "ユーザー登録" : "Google Map掲載";
     const hero = (d.photos && d.photos[0]) || p.cover || "";
     $("#content").innerHTML = `
-      ${hero ? `<img class="hero-img" src="${hero}" alt="">` : `<div class="hero-img" style="background:#ded9cf"></div>`}
+      ${hero ? `<img class="hero-img" src="${hero}" alt="">` : `<div class="hero-img" id="heroBox" style="background:#ded9cf center/cover no-repeat"></div>`}
       <div class="pad">
         <div class="eyebrow">${catLabel(p.category)}${p.visibility==="private"?" ・ 🔒非公開":""}</div>
         <h2 class="section" style="margin-bottom:8px">${escapeHtml(p.name)}</h2>
@@ -91,6 +91,13 @@
         </div>
         <div id="reviews"></div>
       </div>`;
+
+    // hero 写真が無い取り込み施設は Places API から後埋め
+    if (!hero && p.placeId && window.WCMap && WCMap.ready) {
+      WCMap.ready().then(() => WCMap.fetchPhoto && WCMap.fetchPhoto(p.placeId)).then(url => {
+        const hb = document.getElementById("heroBox"); if (hb && url) hb.style.backgroundImage = `url('${url}')`;
+      }).catch(() => {});
+    }
 
     // mini map (content was re-rendered, so #mini is a fresh node)
     if (p.lat != null) {

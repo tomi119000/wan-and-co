@@ -119,6 +119,23 @@
       return [...seen.values()];
     };
 
+    /* place_id から写真URLを取得（カードの後埋め用・キャッシュ付き） */
+    const photoCache = {};
+    WCMap.fetchPhoto = async function (placeId) {
+      if (!placeId) return "";
+      if (photoCache[placeId] !== undefined) return photoCache[placeId];
+      try { const c = sessionStorage.getItem("wc_photo_" + placeId); if (c !== null) { photoCache[placeId] = c; return c; } } catch (e) {}
+      let url = "";
+      try {
+        const place = new google.maps.places.Place({ id: placeId });
+        await place.fetchFields({ fields: ["photos"] });
+        if (place.photos && place.photos[0]) url = place.photos[0].getURI({ maxWidthPx: 800 });
+      } catch (e) { url = ""; }
+      photoCache[placeId] = url;
+      try { sessionStorage.setItem("wc_photo_" + placeId, url); } catch (e) {}
+      return url;
+    };
+
     readyResolve();
   }
 
