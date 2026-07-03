@@ -281,8 +281,10 @@
         await bootstrap;
         const id = placeDocId(g.placeId);
         const ref = db.collection("places").doc(id);
-        const snap = await ref.get();
-        if (snap.exists) return id;
+        // 既存確認。未登録docは読取ルール上 permission-denied になるため、その場合は新規として扱う。
+        let exists = false;
+        try { exists = (await ref.get()).exists; } catch (e) { exists = false; }
+        if (exists) return id;
         await ref.set({
           source: "places", ownerId: cur.id, ownerName: "Google Places", placeId: g.placeId,
           name: g.name, category: catFromTypes(g.types, g.primaryType), address: g.address || "",
