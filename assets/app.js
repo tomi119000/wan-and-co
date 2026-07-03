@@ -46,7 +46,7 @@ function placeCardHTML(p) {
       <div class="meta">
         ${p.avg ? `<span class="stars">${stars(p.avg)}</span> <span>${p.avg.toFixed(1)}</span>` : `<span>口コミなし</span>`}
         <span>📍 ${p.checkinCount || 0} チェックイン</span>
-        <span>${p.source === "google" ? "Google Map掲載" : "ユーザー登録"}</span>
+        <span>${p.source === "user" ? "ユーザー登録" : "Google Map掲載"}</span>
       </div>
     </div>`;
 }

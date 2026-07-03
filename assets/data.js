@@ -63,6 +63,18 @@
   const SEED = seedData();
   const avgOf = p => (p.reviewCount ? (p.ratingSum || 0) / p.reviewCount : null);
 
+  /* Google Places の types → アプリのカテゴリー */
+  function catFromTypes(types, primary) {
+    const t = (primary ? [primary] : []).concat(types || []).map(x => String(x).toLowerCase());
+    const has = k => t.some(x => x.includes(k));
+    if (has("lodging") || has("hotel")) return "hotel";
+    if (has("dog_park") || has("park")) return "park";
+    if (has("pet_store") || has("store") || has("shop")) return "shop";
+    if (has("restaurant") || has("cafe") || has("coffee") || has("food") || has("bar") || has("bakery")) return "cafe";
+    return "other";
+  }
+  const placeDocId = pid => "gp_" + String(pid).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
+
   /* =======================================================================
      LOCAL BACKEND (localStorage) — 端末内。データ共有なし。
      ======================================================================= */
@@ -118,6 +130,14 @@
           visibility: f.visibility || "public", name: f.name, category: f.category, address: f.address,
           desc: f.desc, lat: f.lat, lng: f.lng, photos, checkins: [], reviews: [] };
         list.unshift(rec); saveAll(list); return rec.id;
+      },
+      async importPlace(g) {
+        const id = placeDocId(g.placeId); const list = all();
+        if (list.some(p => p.id === id)) return id;
+        list.unshift({ id, source: "places", ownerId: cur ? cur.id : null, ownerName: "Google Places",
+          name: g.name, category: catFromTypes(g.types, g.primaryType), address: g.address || "", desc: "",
+          lat: g.lat, lng: g.lng, visibility: "public", photos: [], checkins: [], reviews: [], createdAt: Date.now() });
+        saveAll(list); return id;
       },
       async addReview(id, { rating, text }) {
         const list = all(); const p = list.find(x => x.id === id); if (!p) return;
@@ -255,6 +275,21 @@
         for (const url of covers) await ref.collection("photos").add({ url, at: FS.FieldValue.serverTimestamp() });
         if (cur) db.collection("users").doc(cur.id).set({ placeCount: FS.FieldValue.increment(1) }, { merge: true }).catch(() => {});
         return ref.id;
+      },
+      /* Places API の検索結果を DB に取り込む（place_id で重複排除） */
+      async importPlace(g) {
+        await bootstrap;
+        const id = placeDocId(g.placeId);
+        const ref = db.collection("places").doc(id);
+        const snap = await ref.get();
+        if (snap.exists) return id;
+        await ref.set({
+          source: "places", ownerId: cur.id, ownerName: "Google Places", placeId: g.placeId,
+          name: g.name, category: catFromTypes(g.types, g.primaryType), address: g.address || "",
+          desc: "", lat: g.lat, lng: g.lng, visibility: "public", cover: "",
+          checkinCount: 0, reviewCount: 0, ratingSum: 0, createdAt: FS.FieldValue.serverTimestamp(),
+        });
+        return id;
       },
       async addReview(id, { rating, text }) {
         await bootstrap;

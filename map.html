@@ -28,6 +28,10 @@
       <button class="locate-btn" id="locate" title="現在地">📍</button>
     </div>
 
+    <div class="pad" style="padding-bottom:0">
+      <button id="findBtn" class="btn btn-ghost" style="display:none">🔍 このエリアの犬同伴スポットを探す</button>
+    </div>
+
     <div class="pad">
       <div class="eyebrow">NEARBY</div>
       <h2 class="section">近くのスポット <span class="sans" style="font-size:14px;color:var(--muted)" id="count"></span></h2>
@@ -60,9 +64,49 @@
     if (!user) { location.href = "index.html"; return; }
     $("#cards").innerHTML = `<div class="empty"><div class="big">🐾</div>読み込み中…</div>`;
     try { places = await Store.visible(); } catch (e) { places = []; toast("データの取得に失敗しました。"); }
-    WCMap.ready().then(() => { map = WCMap.create("map", { interactive: true }); render(); });
+    WCMap.ready().then(() => {
+      map = WCMap.create("map", { interactive: true });
+      render();
+      if (WCMap.canSearch) $("#findBtn").style.display = "flex"; // Google Maps モードのみ
+    });
     render();
   })();
+
+  /* ---- Places API: 実在の犬同伴スポットを探す → 取り込み ---- */
+  let findResults = [];
+  const gpId = pid => "gp_" + String(pid).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
+
+  window.__wcImport = async (i) => {
+    const g = findResults[i]; if (!g) return;
+    toast("施設を取り込み中…");
+    try { const id = await Store.importPlace(g); location.href = `place.html?id=${id}`; }
+    catch (e) { toast("取り込みに失敗しました。"); }
+  };
+
+  $("#findBtn").addEventListener("click", async () => {
+    if (!map || !WCMap.canSearch) return;
+    const btn = $("#findBtn"); btn.disabled = true; btn.textContent = "検索中…";
+    try {
+      const results = await WCMap.searchDogFriendly(map.center(), 4000);
+      // 既に登録済みの施設は除外
+      findResults = results.filter(g => !places.some(p => p.id === gpId(g.placeId)));
+      render(); // ベースのマーカーを描き直してから発見マーカーを重ねる
+      findResults.forEach((g, i) => {
+        map.addMarker({ lat: g.lat, lng: g.lng }, {
+          pin: "find", title: g.name,
+          html: `<div style="min-width:190px;font-family:sans-serif">
+              <b style="font-size:14px">${escapeHtml(g.name)}</b><br>
+              <span style="color:#7d7a72;font-size:12px">${escapeHtml(g.address || "")}</span><br>
+              <button onclick="__wcImport(${i})" style="margin-top:8px;background:#1c1f26;color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px">この施設で口コミ・チェックイン</button>
+            </div>`,
+        });
+      });
+      toast(findResults.length ? `${findResults.length}件の候補が見つかりました🐾` : "このエリアでは候補が見つかりませんでした");
+    } catch (e) {
+      toast(e.message || "検索に失敗しました。");
+    }
+    btn.disabled = false; btn.textContent = "🔍 このエリアの犬同伴スポットを探す";
+  });
 
   function filtered() { return places.filter(p => activeCat === "all" || p.category === activeCat); }
 

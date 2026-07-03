@@ -25,6 +25,12 @@
        <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z" fill="#b48b46"/>
        <circle cx="17" cy="17" r="7" fill="#fff"/>
      </svg>`);
+  // Places 検索の発見マーカー（未登録の実在スポット用・ダークグレー＋肉球）
+  const PIN_FIND = "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="46" viewBox="0 0 34 46">
+       <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z" fill="#2b2f3a"/>
+       <circle cx="17" cy="17" r="7.5" fill="#caa45f"/>
+     </svg>`);
 
   let readyResolve;
   const readyPromise = new Promise(r => (readyResolve = r));
@@ -54,10 +60,11 @@
       let markers = [], info = new google.maps.InfoWindow(), you = null;
       return {
         raw: map,
+        center() { const c = map.getCenter(); return { lat: c.lat(), lng: c.lng() }; },
         addMarker(pos, o = {}) {
           const mk = new google.maps.Marker({
             position: pos, map, title: o.title || "",
-            icon: { url: PIN, scaledSize: new google.maps.Size(34, 46), anchor: new google.maps.Point(17, 46) },
+            icon: { url: o.pin === "find" ? PIN_FIND : PIN, scaledSize: new google.maps.Size(34, 46), anchor: new google.maps.Point(17, 46) },
           });
           if (o.html) mk.addListener("click", () => { info.setContent(o.html); info.open(map, mk); });
           if (o.onClick) mk.addListener("click", o.onClick);
@@ -75,6 +82,40 @@
         },
       };
     };
+
+    /* Places API (New): 近くの犬同伴スポットを検索（実在施設・未登録） */
+    WCMap.canSearch = true;
+    WCMap.searchDogFriendly = async function (center, radiusMeters) {
+      radiusMeters = radiusMeters || 4000;
+      const Place = google.maps.places && google.maps.places.Place;
+      if (!Place || !Place.searchByText) throw new Error("Places API (New) が利用できません。");
+      const queries = ["犬同伴 カフェ", "ドッグカフェ", "ドッグラン", "ペット可 レストラン"];
+      const seen = new Map();
+      for (const q of queries) {
+        try {
+          const { places } = await Place.searchByText({
+            textQuery: q,
+            fields: ["id", "displayName", "location", "formattedAddress", "types", "primaryType"],
+            locationBias: { center, radius: radiusMeters },
+            maxResultCount: 8,
+            language: "ja", region: "jp",
+          });
+          (places || []).forEach(p => {
+            if (!p.location) return;
+            seen.set(p.id, {
+              placeId: p.id,
+              name: (typeof p.displayName === "string" ? p.displayName : (p.displayName && p.displayName.text)) || "名称不明",
+              address: p.formattedAddress || "",
+              lat: p.location.lat(), lng: p.location.lng(),
+              types: p.types || [],
+              primaryType: p.primaryType || "",
+            });
+          });
+        } catch (e) { /* 個々のクエリ失敗は無視して続行 */ }
+      }
+      return [...seen.values()];
+    };
+
     readyResolve();
   }
 
@@ -92,7 +133,9 @@
   /* ---------------- Leaflet backend ---------------- */
   function initLeaflet() {
     const icon = L.icon({ iconUrl: PIN, iconSize: [34, 46], iconAnchor: [17, 46], popupAnchor: [0, -40] });
+    const iconFind = L.icon({ iconUrl: PIN_FIND, iconSize: [34, 46], iconAnchor: [17, 46], popupAnchor: [0, -40] });
     WCMap.provider = "leaflet";
+    WCMap.canSearch = false; // Places 検索は Google Maps モードのみ
     WCMap.create = function (elId, opts = {}) {
       const interactive = opts.interactive !== false;
       const map = L.map(elId, {
@@ -104,8 +147,9 @@
       let markers = [], you = null;
       return {
         raw: map,
+        center() { const c = map.getCenter(); return { lat: c.lat, lng: c.lng }; },
         addMarker(pos, o = {}) {
-          const mk = L.marker([pos.lat, pos.lng], { icon }).addTo(map);
+          const mk = L.marker([pos.lat, pos.lng], { icon: o.pin === "find" ? iconFind : icon }).addTo(map);
           if (o.html) mk.bindPopup(o.html);
           if (o.onClick) mk.on("click", o.onClick);
           markers.push(mk); return mk;

@@ -42,7 +42,7 @@
 
   function render(d) {
     const p = d.place;
-    $("#src").textContent = p.source === "google" ? "Google Map掲載" : "ユーザー登録";
+    $("#src").textContent = p.source === "user" ? "ユーザー登録" : "Google Map掲載";
     const hero = (d.photos && d.photos[0]) || p.cover || "";
     $("#content").innerHTML = `
       ${hero ? `<img class="hero-img" src="${hero}" alt="">` : `<div class="hero-img" style="background:#ded9cf"></div>`}
