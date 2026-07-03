@@ -40,24 +40,27 @@
   </div>
   </div>
 
+<script src="assets/config.js"></script>
+<script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
   // already logged in? go to map
-  if (Auth.currentUser()) location.href = "map.html";
+  Data.ready().then(u => { if (u) location.href = "map.html"; });
 
-  $("#loginForm").addEventListener("submit", e => {
+  $("#loginForm").addEventListener("submit", async e => {
     e.preventDefault();
+    const btn = $("#loginForm button"); btn.disabled = true;
     try {
-      Auth.login({ email: $("#email").value.trim(), password: $("#password").value });
+      await Auth.login({ email: $("#email").value.trim(), password: $("#password").value });
       location.href = "map.html";
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message); btn.disabled = false; }
   });
 
   // demo guest: create/login a sample account instantly
-  $("#demoLogin").addEventListener("click", e => {
+  $("#demoLogin").addEventListener("click", async e => {
     e.preventDefault();
     const cred = { name: "体験ユーザー", email: "guest@demo.jp", password: "demo1234" };
-    try { Auth.login(cred); } catch { Auth.signup(cred); }
+    try { await Auth.login(cred); } catch { try { await Auth.signup(cred); } catch (err) { return toast(err.message); } }
     location.href = "map.html";
   });
 </script>

@@ -39,18 +39,21 @@
   </div>
   </div>
 
+<script src="assets/config.js"></script>
+<script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  $("#signupForm").addEventListener("submit", e => {
+  $("#signupForm").addEventListener("submit", async e => {
     e.preventDefault();
+    const btn = $("#signupForm button"); btn.disabled = true;
     try {
-      Auth.signup({
+      await Auth.signup({
         name: $("#name").value.trim(),
         email: $("#email").value.trim(),
         password: $("#password").value,
       });
       location.href = "map.html";
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message); btn.disabled = false; }
   });
 </script>
 </body>

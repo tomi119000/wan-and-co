@@ -59,12 +59,29 @@ python3 -m http.server 8000
 Google Maps / Leaflet を同一 API（`create / addMarker / setView / onClick / setYou`）で扱えます。
 各ページ（`map.html` / `place.html` / `add.html`）はこのラッパー経由なので、プロバイダ差を意識せず動きます。
 
-## その他の本番化ポイント
+## みんなで共有（Firebase 連携）— 実装済み
 
-1. **認証：`Auth`（localStorage）→ Firebase Authentication**
-   `assets/app.js` の `Auth.login/signup/logout` を Firebase Auth の対応メソッドに差し替え。
-2. **データ／写真：`Store`（localStorage）→ Cloud Firestore + Firebase Storage**
-   `Store.*` を Firestore クエリに、`fileToDataURL` を Storage アップロードに置換します。
-3. **既存施設：シードデータ → Places API（Nearby Search）** で「Google Map掲載」施設を実データ化。
+認証とデータを **Firebase Authentication + Cloud Firestore** に対応済みです。
+`config.js` に Firebase 設定を入れると、全ユーザーが同じデータ（登録スポット・口コミ・チェックイン）を
+共有する本番モードに切り替わります。未設定なら従来通り端末内(localStorage)で動作します。
 
-> デモではパスワードや写真は端末内にのみ保存されます。本番では必ず上記のマネージドサービスをご利用ください。
+### セットアップ手順
+
+1. [Firebase コンソール](https://console.firebase.google.com/) で **プロジェクトを作成**
+2. **Authentication** → Sign-in method →「**メール/パスワード**」を有効化
+3. **Firestore Database** → データベースを作成（本番モードでOK）
+4. **Firestore のルール** に [`firestore.rules`](firestore.rules) の内容を貼り付けて公開
+5. プロジェクト設定 → マイアプリ →「**</>**（ウェブ）」でアプリを追加し、表示された
+   `firebaseConfig` を [`assets/config.js`](assets/config.js) の `firebase:` に貼り付け
+6. リロードすると共有モードに切替（初回ログイン時に既存施設4件が自動投入されます）
+
+### 設計（データ層）
+
+- すべてのデータ操作は [`assets/data.js`](assets/data.js) の `Auth` / `Store` に集約。
+  Firebase と localStorage を**同じ非同期API**で扱えるため、各ページはバックエンドを意識しません。
+- 写真は Storage 課金を避けるため、クライアント側で縮小圧縮して Firestore に保存します
+  （大量・高解像度運用時は Firebase Storage への移行を推奨）。
+- 既存施設（Google Map掲載）は `source: "google"` のシードデータ。将来 Places API に置換可能。
+
+> ⚠️ このリポジトリは公開です。`config.js` に実キーを入れて push する場合は、Google Maps キーに
+> HTTPリファラー制限を、Firebase には上記 `firestore.rules` によるアクセス制限を必ず設定してください。

@@ -17,4 +17,29 @@ window.WC_CONFIG = {
   // 地図の初期表示位置（東京・中心部）
   DEFAULT_CENTER: { lat: 35.6720, lng: 139.7100 },
   DEFAULT_ZOOM: 13,
+
+  /* ---------------------------------------------------------
+     Firebase 連携（「みんなで共有」を有効にする）
+     -----------------------------------------------------------
+     Firebase コンソールで Web アプリを登録すると表示される
+     firebaseConfig をここに貼り付けてください。
+     apiKey が空のあいだは、これまで通り端末内(localStorage)で
+     動作します（＝データは共有されません）。
+
+     ▼ 取得方法:
+       https://console.firebase.google.com/
+       1. プロジェクトを作成
+       2. Authentication → Sign-in method →「メール/パスワード」を有効化
+       3. Firestore Database → データベースを作成（本番/ロックモードでOK・後でルール設定）
+       4. プロジェクトの設定 → マイアプリ →「</>」でWebアプリを追加
+          → 表示される firebaseConfig の中身を下にコピー
+     --------------------------------------------------------- */
+  firebase: {
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: "",
+  },
 };

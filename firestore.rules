@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// Wan & Co. — Firestore セキュリティルール
+// Firebase コンソール → Firestore Database → ルール に貼り付けて「公開」してください。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    // 施設
+    match /places/{place} {
+      // 公開スポットは誰でも閲覧可。非公開は所有者のみ。
+      allow read: if resource.data.visibility == 'public'
+                  || (signedIn() && resource.data.ownerId == request.auth.uid);
+
+      // 作成はログインユーザー。自分を所有者として登録する場合のみ。
+      allow create: if signedIn()
+                    && request.resource.data.ownerId == request.auth.uid;
+
+      // 更新は「所有者による編集」または「集計フィールドだけの更新（他人のチェックイン/口コミ反映）」を許可
+      allow update: if signedIn() && (
+        resource.data.ownerId == request.auth.uid
+        || request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['checkinCount','reviewCount','ratingSum'])
+      );
+
+      // 削除は所有者のみ
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      // 口コミ（誰でも閲覧・ログインユーザーが投稿）
+      match /reviews/{r} {
+        allow read: if true;
+        allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      }
+
+      // 写真（誰でも閲覧・ログインユーザーが追加）
+      match /photos/{p} {
+        allow read: if true;
+        allow create: if signedIn();
+      }
+
+      // チェックイン（誰でも閲覧・本人のみ作成。ID = userId_YYYY-MM-DD で1日1回）
+      match /checkins/{c} {
+        allow read: if true;
+        allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // ユーザー集計（本人のみ読み書き）
+    match /users/{uid} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // シード投入マーカー（ログインユーザーが1度だけ作成）
+    match /meta/{doc} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+  }
+}

@@ -76,12 +76,12 @@
   </div>
 
 <script src="assets/config.js"></script>
+<script src="assets/data.js"></script>
 <script src="assets/maps.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  if (!Auth.requireLogin()) throw "redirect";
-  const user = Auth.currentUser();
-  let picked = null, photos = [], map = null;
+  let picked = null, files = [], map = null;
+  (async () => { const u = await Data.ready(); if (!u) location.href = "index.html"; })();
 
   function setPoint(lat, lng) {
     picked = [lat, lng];
@@ -105,40 +105,46 @@
     );
   });
 
-  // photo previews
-  $("#photos").addEventListener("change", async e => {
+  // photo previews (File objects; compressed on save)
+  $("#photos").addEventListener("change", e => {
     for (const f of e.target.files) {
-      if (photos.length >= 6) { toast("写真は最大6枚までです。"); break; }
-      photos.push(await fileToDataURL(f));
+      if (files.length >= 6) { toast("写真は最大6枚までです。"); break; }
+      files.push(f);
     }
     e.target.value = "";
     renderPreviews();
   });
   function renderPreviews() {
     const row = $("#previews"); row.innerHTML = "";
-    photos.forEach((src, i) => {
+    files.forEach((file, i) => {
       const d = document.createElement("div"); d.className = "pv";
-      d.innerHTML = `<img src="${src}"><button type="button" aria-label="削除">×</button>`;
-      d.querySelector("button").onclick = () => { photos.splice(i,1); renderPreviews(); };
+      d.innerHTML = `<img src="${URL.createObjectURL(file)}"><button type="button" aria-label="削除">×</button>`;
+      d.querySelector("button").onclick = () => { files.splice(i,1); renderPreviews(); };
       row.appendChild(d);
     });
   }
 
-  $("#form").addEventListener("submit", e => {
+  $("#form").addEventListener("submit", async e => {
     e.preventDefault();
-    const place = {
+    if (!$("#name").value.trim()) return toast("施設名を入力してください。");
+    const btn = $("#form button[type=submit]"); btn.disabled = true; btn.textContent = "登録中…";
+    const fields = {
       name: $("#name").value.trim(),
       category: $("#category").value,
       address: $("#address").value.trim(),
       desc: $("#desc").value.trim(),
-      photos,
       lat: picked ? picked[0] : null,
       lng: picked ? picked[1] : null,
       visibility: document.querySelector('input[name="vis"]:checked').value,
     };
-    const rec = Store.add(place, user);
-    toast("スポットを登録しました！🎉");
-    setTimeout(() => location.href = `place.html?id=${rec.id}`, 700);
+    try {
+      const id = await Store.add(fields, files);
+      toast("スポットを登録しました！🎉");
+      setTimeout(() => location.href = `place.html?id=${id}`, 700);
+    } catch (err) {
+      toast("登録に失敗しました。" + (err.message ? "（" + err.message + "）" : ""));
+      btn.disabled = false; btn.textContent = "この場所を登録する";
+    }
   });
 
   mountNav("add");

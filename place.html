@@ -16,52 +16,62 @@
   </div>
 
 <script src="assets/config.js"></script>
+<script src="assets/data.js"></script>
 <script src="assets/maps.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  if (!Auth.requireLogin()) throw "redirect";
-  const user = Auth.currentUser();
   const id = new URLSearchParams(location.search).get("id");
-  let p = Store.get(id);
-  let miniInit = false;
 
-  if (!p) {
-    $("#content").innerHTML = `<div class="empty"><div class="big">🐾</div>スポットが見つかりませんでした。<br><br><a class="btn btn-ghost" href="map.html">マップへ戻る</a></div>`;
-    throw "not found";
+  (async () => {
+    const user = await Data.ready();
+    if (!user) { location.href = "index.html"; return; }
+    $("#content").innerHTML = `<div class="empty"><div class="big">🐾</div>読み込み中…</div>`;
+    await load();
+    mountNav("map");
+  })();
+
+  async function load() {
+    let d;
+    try { d = await Store.detail(id); } catch (e) { d = null; }
+    if (!d) {
+      $("#content").innerHTML = `<div class="empty"><div class="big">🐾</div>スポットが見つかりませんでした。<br><br><a class="btn btn-ghost" href="map.html">マップへ戻る</a></div>`;
+      return;
+    }
+    render(d);
   }
 
-  function render() {
-    p = Store.get(id);
-    $("#src").textContent = p.source === "google" ? "Google Maps掲載" : "ユーザー登録";
-    const avg = Store.avgRating(p);
-    const hero = (p.photos && p.photos[0]) ? p.photos[0] : "";
-    const c = $("#content");
-    c.innerHTML = `
+  function render(d) {
+    const p = d.place;
+    $("#src").textContent = p.source === "google" ? "Google Map掲載" : "ユーザー登録";
+    const hero = (d.photos && d.photos[0]) || p.cover || "";
+    $("#content").innerHTML = `
       ${hero ? `<img class="hero-img" src="${hero}" alt="">` : `<div class="hero-img" style="background:#ded9cf"></div>`}
       <div class="pad">
         <div class="eyebrow">${catLabel(p.category)}${p.visibility==="private"?" ・ 🔒非公開":""}</div>
-        <h2 class="section" style="margin-bottom:8px">${p.name}</h2>
-        <p class="sans" style="color:var(--muted);margin-top:0">📍 ${p.address || "住所未登録"}</p>
+        <h2 class="section" style="margin-bottom:8px">${escapeHtml(p.name)}</h2>
+        <p class="sans" style="color:var(--muted);margin-top:0">📍 ${escapeHtml(p.address || "住所未登録")}</p>
 
         <div class="stat-row" style="margin:16px 0 20px">
-          <div class="stat"><div class="num">${avg?avg.toFixed(1):"–"}</div><div class="lbl">評価</div></div>
-          <div class="stat"><div class="num">${(p.checkins||[]).length}</div><div class="lbl">チェックイン</div></div>
-          <div class="stat"><div class="num">${(p.reviews||[]).length}</div><div class="lbl">口コミ</div></div>
+          <div class="stat"><div class="num">${p.avg?p.avg.toFixed(1):"–"}</div><div class="lbl">評価</div></div>
+          <div class="stat"><div class="num">${p.checkinCount||0}</div><div class="lbl">チェックイン</div></div>
+          <div class="stat"><div class="num">${p.reviewCount||0}</div><div class="lbl">口コミ</div></div>
         </div>
 
-        ${p.desc ? `<p>${p.desc}</p>` : ""}
+        ${p.desc ? `<p>${escapeHtml(p.desc)}</p>` : ""}
 
-        <button class="btn btn-gold" id="checkin" style="margin:8px 0 6px">✓ ここにチェックインする</button>
+        <button class="btn btn-gold" id="checkin" style="margin:8px 0 6px" ${d.checkedInToday?"disabled style='opacity:.6'":""}>
+          ${d.checkedInToday ? "✓ 本日チェックイン済み" : "✓ ここにチェックインする"}
+        </button>
         <p class="hint sans center">同伴ルールを守って、素敵な時間を。</p>
 
-        ${p.photos && p.photos.length > 1 ? `
+        ${d.photos && d.photos.length > 1 ? `
           <h3 class="section" style="font-size:18px;margin-top:24px">フォト</h3>
-          <div class="gallery">${p.photos.map(u=>`<img src="${u}" alt="">`).join("")}</div>` : ""}
+          <div class="gallery">${d.photos.map(u=>`<img src="${u}" alt="">`).join("")}</div>` : ""}
 
         <h3 class="section" style="font-size:18px;margin-top:26px">場所</h3>
         <div class="card"><div id="mini" style="height:200px"></div></div>
 
-        <h3 class="section" style="font-size:18px;margin-top:26px">口コミ（${(p.reviews||[]).length}）</h3>
+        <h3 class="section" style="font-size:18px;margin-top:26px">口コミ（${p.reviewCount||0}）</h3>
         <div class="card pad" style="margin-bottom:16px">
           <div class="field" style="margin-bottom:12px">
             <label>評価</label>
@@ -82,48 +92,47 @@
         <div id="reviews"></div>
       </div>`;
 
-    // mini map (init once; render() may re-run after check-in/review)
-    if (p.lat != null && !miniInit) {
-      miniInit = true;
+    // mini map (content was re-rendered, so #mini is a fresh node)
+    if (p.lat != null) {
       WCMap.ready().then(() => {
         const mini = WCMap.create("mini", { center: { lat: p.lat, lng: p.lng }, zoom: 15, interactive: false });
         mini.addMarker({ lat: p.lat, lng: p.lng }, { title: p.name });
       });
-    } else if (p.lat == null) { $("#mini").innerHTML = '<div class="empty sans">位置情報は登録されていません</div>'; }
+    } else { $("#mini").innerHTML = '<div class="empty sans">位置情報は登録されていません</div>'; }
 
     // reviews list
     const rv = $("#reviews");
-    const reviews = p.reviews || [];
-    rv.innerHTML = reviews.length ? "" : `<p class="sans" style="color:var(--muted)">まだ口コミがありません。最初の一件を投稿しましょう。</p>`;
-    reviews.forEach(r => {
+    rv.innerHTML = (d.reviews && d.reviews.length) ? "" : `<p class="sans" style="color:var(--muted)">まだ口コミがありません。最初の一件を投稿しましょう。</p>`;
+    (d.reviews || []).forEach(r => {
       const el = document.createElement("div"); el.className = "review";
       el.innerHTML = `
         <div class="head">
-          <div class="avatar">${(r.userName||"?")[0]}</div>
-          <div><div class="who">${r.userName||"ユーザー"}</div><div class="when">${timeAgo(r.at)}</div></div>
+          <div class="avatar">${escapeHtml((r.userName||"?")[0])}</div>
+          <div><div class="who">${escapeHtml(r.userName||"ユーザー")}</div><div class="when">${timeAgo(r.at)}</div></div>
         </div>
         ${r.rating?`<div class="stars">${stars(r.rating)}</div>`:""}
-        <p class="text">${r.text||""}</p>`;
+        <p class="text">${escapeHtml(r.text||"")}</p>`;
       rv.appendChild(el);
     });
 
     // actions
-    $("#checkin").onclick = () => {
-      const { added } = Store.checkIn(id, user);
-      toast(added ? "チェックインしました！🐾" : "本日はチェックイン済みです。");
-      render();
+    $("#checkin").onclick = async (e) => {
+      e.target.disabled = true;
+      try {
+        const { added } = await Store.checkIn(id);
+        toast(added ? "チェックインしました！🐾" : "本日はチェックイン済みです。");
+      } catch (err) { toast("チェックインに失敗しました。"); }
+      await load();
     };
-    $("#postReview").onclick = () => {
+    $("#postReview").onclick = async (e) => {
       const text = $("#ctext").value.trim();
       if (!text) return toast("コメントを入力してください。");
-      Store.addReview(id, user, { rating: +$("#rating").value, text });
-      toast("口コミを投稿しました。");
-      render();
+      e.target.disabled = true;
+      try { await Store.addReview(id, { rating: +$("#rating").value, text }); toast("口コミを投稿しました。"); }
+      catch (err) { toast("投稿に失敗しました。"); e.target.disabled = false; return; }
+      await load();
     };
   }
-
-  render();
-  mountNav(p.source === "user" ? "list" : "map");
 </script>
 </body>
 </html>

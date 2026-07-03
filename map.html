@@ -36,15 +36,13 @@
   </div>
 
 <script src="assets/config.js"></script>
+<script src="assets/data.js"></script>
 <script src="assets/maps.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  if (!Auth.requireLogin()) throw "redirect";
-  const user = Auth.currentUser();
-  $("#logout").addEventListener("click", () => Auth.logout());
+  let activeCat = "all", map = null, places = [];
 
-  let activeCat = "all";
-  let map = null;
+  $("#logout").addEventListener("click", async () => { await Auth.logout(); location.href = "index.html"; });
 
   /* ---- category chips ---- */
   const catsEl = $("#cats");
@@ -56,54 +54,39 @@
     catsEl.appendChild(b);
   });
 
-  /* ---- map (Google Maps API / Leaflet fallback) ---- */
-  WCMap.ready().then(() => {
-    map = WCMap.create("map", { interactive: true });
+  /* ---- boot: require login, then load data + map ---- */
+  (async () => {
+    const user = await Data.ready();
+    if (!user) { location.href = "index.html"; return; }
+    $("#cards").innerHTML = `<div class="empty"><div class="big">🐾</div>読み込み中…</div>`;
+    try { places = await Store.visible(); } catch (e) { places = []; toast("データの取得に失敗しました。"); }
+    WCMap.ready().then(() => { map = WCMap.create("map", { interactive: true }); render(); });
     render();
-  });
+  })();
 
-  function filtered() {
-    return Store.visible(user).filter(p => activeCat === "all" || p.category === activeCat);
-  }
+  function filtered() { return places.filter(p => activeCat === "all" || p.category === activeCat); }
 
   function render() {
-    // markers
+    const list = filtered();
     if (map) {
       map.clearMarkers();
-      filtered().forEach(p => {
+      list.forEach(p => {
         if (p.lat == null) return;
         map.addMarker({ lat: p.lat, lng: p.lng }, {
           title: p.name,
-          html: `<b>${p.name}</b><br>${catLabel(p.category)}<br>
+          html: `<b>${escapeHtml(p.name)}</b><br>${catLabel(p.category)}<br>
             <a href="place.html?id=${p.id}" style="color:#b48b46">詳細を見る →</a>`,
         });
       });
     }
-    const list = filtered();
-
-    // cards
     $("#count").textContent = `（${list.length}件）`;
     const cards = $("#cards"); cards.innerHTML = "";
     if (!list.length) { cards.innerHTML = `<div class="empty"><div class="big">🐾</div>このカテゴリのスポットはまだありません。</div>`; return; }
     list.forEach(p => {
-      const avg = Store.avgRating(p);
       const a = document.createElement("a");
       a.href = `place.html?id=${p.id}`; a.className = "card place-card";
       a.style.marginBottom = "16px"; a.style.display = "block";
-      const bg = (p.photos && p.photos[0]) ? `background-image:url('${p.photos[0]}')` : "background:#ded9cf";
-      a.innerHTML = `
-        <div class="thumb" style="${bg}">
-          <span class="badge">${catLabel(p.category)}</span>
-          ${p.visibility === "private" ? `<span class="lock">🔒 非公開</span>` : ""}
-        </div>
-        <div class="body">
-          <h3>${p.name}</h3>
-          <div class="meta">
-            ${avg ? `<span class="stars">${stars(avg)}</span> <span>${avg.toFixed(1)}</span>` : `<span>口コミなし</span>`}
-            <span>📍 ${(p.checkins||[]).length} チェックイン</span>
-            <span>${p.source === "google" ? "Google Maps掲載" : "ユーザー登録"}</span>
-          </div>
-        </div>`;
+      a.innerHTML = placeCardHTML(p);
       cards.appendChild(a);
     });
   }

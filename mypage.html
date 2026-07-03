@@ -40,47 +40,45 @@
     </div>
   </div>
 
+<script src="assets/config.js"></script>
+<script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 <script>
-  if (!Auth.requireLogin()) throw "redirect";
-  const user = Auth.currentUser();
-  $("#logout").addEventListener("click", () => Auth.logout());
+  let user = null;
+  $("#logout").addEventListener("click", async () => { await Auth.logout(); location.href = "index.html"; });
 
-  $("#av").textContent = (user.name||"?")[0];
-  $("#uname").textContent = user.name;
-  $("#uemail").textContent = user.email;
+  (async () => {
+    user = await Data.ready();
+    if (!user) { location.href = "index.html"; return; }
+    $("#av").textContent = (user.name||"?")[0];
+    $("#uname").textContent = user.name;
+    $("#uemail").textContent = user.email;
+    await render();
+    mountNav("my");
+  })();
 
-  function render() {
-    const all = Store.all();
-    const mine = all.filter(p => p.ownerId === user.id);
-    const myCheckins = all.reduce((n,p)=> n + (p.checkins||[]).filter(c=>c.userId===user.id).length, 0);
-    const myReviews  = all.reduce((n,p)=> n + (p.reviews||[]).filter(r=>r.userId===user.id).length, 0);
+  async function render() {
+    const box = $("#mine");
+    box.innerHTML = `<div class="empty"><div class="big">🐾</div>読み込み中…</div>`;
+    let mine = [], stats = { places: 0, checkins: 0, reviews: 0 };
+    try { [mine, stats] = await Promise.all([Store.mine(), Store.myStats()]); }
+    catch (e) { toast("データの取得に失敗しました。"); }
 
-    $("#sPlaces").textContent = mine.length;
-    $("#sCheck").textContent  = myCheckins;
-    $("#sRev").textContent    = myReviews;
+    $("#sPlaces").textContent = stats.places;
+    $("#sCheck").textContent  = stats.checkins;
+    $("#sRev").textContent    = stats.reviews;
 
-    const box = $("#mine"); box.innerHTML = "";
+    box.innerHTML = "";
     if (!mine.length) {
       box.innerHTML = `<div class="empty"><div class="big">🐾</div>まだ登録がありません。<br>お気に入りの場所を追加しましょう。<br><br><a class="btn btn-gold" href="add.html" style="max-width:240px;margin:0 auto">＋ スポットを登録</a></div>`;
       return;
     }
     mine.forEach(p => {
-      const bg = (p.photos&&p.photos[0])?`background-image:url('${p.photos[0]}')`:"background:#ded9cf";
       const card = document.createElement("div"); card.className = "card"; card.style.marginBottom="16px";
       card.innerHTML = `
-        <a href="place.html?id=${p.id}" class="place-card">
-          <div class="thumb" style="${bg}">
-            <span class="badge">${catLabel(p.category)}</span>
-            ${p.visibility==="private"?`<span class="lock">🔒 非公開</span>`:""}
-          </div>
-          <div class="body">
-            <h3>${p.name}</h3>
-            <div class="meta"><span>📍 ${(p.checkins||[]).length} チェックイン</span><span>💬 ${(p.reviews||[]).length}</span></div>
-          </div>
-        </a>
+        <a href="place.html?id=${p.id}" class="place-card">${placeCardHTML(p)}</a>
         <div class="pad" style="padding-top:0;display:flex;gap:10px">
-          <button class="btn btn-ghost btn-sm toggle" data-id="${p.id}" style="flex:1">
+          <button class="btn btn-ghost btn-sm toggle" data-id="${p.id}" data-vis="${p.visibility}" style="flex:1">
             ${p.visibility==="public"?"🔒 非公開にする":"🌐 公開する"}
           </button>
           <button class="btn btn-danger btn-sm del" data-id="${p.id}">削除</button>
@@ -88,19 +86,21 @@
       box.appendChild(card);
     });
 
-    $$(".toggle").forEach(b => b.onclick = () => {
-      const list = Store.all(); const p = list.find(x=>x.id===b.dataset.id);
-      p.visibility = p.visibility === "public" ? "private" : "public";
-      Store.save(list); toast(p.visibility==="public"?"公開しました。":"非公開にしました。"); render();
+    $$(".toggle").forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      const next = b.dataset.vis === "public" ? "private" : "public";
+      try { await Store.setVisibility(b.dataset.id, next); toast(next==="public"?"公開しました。":"非公開にしました。"); }
+      catch (e) { toast("変更に失敗しました。"); }
+      await render();
     });
-    $$(".del").forEach(b => b.onclick = () => {
+    $$(".del").forEach(b => b.onclick = async () => {
       if (!confirm("このスポットを削除しますか？")) return;
-      Store.save(Store.all().filter(x=>x.id!==b.dataset.id));
-      toast("削除しました。"); render();
+      b.disabled = true;
+      try { await Store.remove(b.dataset.id); toast("削除しました。"); }
+      catch (e) { toast("削除に失敗しました。"); }
+      await render();
     });
   }
-  render();
-  mountNav("my");
 </script>
 </body>
 </html>
