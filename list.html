@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>スポット一覧 — Wan &amp; Co.</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">🐾</div>
+        <div><h1>スポット</h1><div class="sub">All places</div></div>
+      </div>
+    </header>
+
+    <div class="pad">
+      <div class="field" style="margin-bottom:14px">
+        <input type="search" id="q" placeholder="🔍 施設名・エリアで検索">
+      </div>
+      <div class="chips" id="cats" style="margin-bottom:16px"></div>
+      <div id="cards"></div>
+    </div>
+  </div>
+
+<script src="assets/app.js"></script>
+<script>
+  if (!Auth.requireLogin()) throw "redirect";
+  const user = Auth.currentUser();
+  let activeCat = "all", q = "";
+
+  const catsEl = $("#cats");
+  CATEGORIES.forEach(c => {
+    const b = document.createElement("button");
+    b.className = "chip" + (c.key === "all" ? " active" : "");
+    b.textContent = `${c.icon} ${c.label}`;
+    b.onclick = () => { activeCat = c.key; $$(".chip", catsEl).forEach(x=>x.classList.remove("active")); b.classList.add("active"); render(); };
+    catsEl.appendChild(b);
+  });
+  $("#q").addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); render(); });
+
+  function render() {
+    const list = Store.visible(user).filter(p =>
+      (activeCat === "all" || p.category === activeCat) &&
+      (!q || (p.name + " " + (p.address||"")).toLowerCase().includes(q))
+    );
+    const cards = $("#cards"); cards.innerHTML = "";
+    if (!list.length) { cards.innerHTML = `<div class="empty"><div class="big">🔍</div>該当するスポットがありません。</div>`; return; }
+    list.forEach(p => {
+      const avg = Store.avgRating(p);
+      const bg = (p.photos && p.photos[0]) ? `background-image:url('${p.photos[0]}')` : "background:#ded9cf";
+      const a = document.createElement("a");
+      a.href = `place.html?id=${p.id}`; a.className = "card place-card"; a.style.marginBottom="16px"; a.style.display="block";
+      a.innerHTML = `
+        <div class="thumb" style="${bg}">
+          <span class="badge">${catLabel(p.category)}</span>
+          ${p.visibility==="private"?`<span class="lock">🔒 非公開</span>`:""}
+        </div>
+        <div class="body">
+          <h3>${p.name}</h3>
+          <div class="meta">
+            ${avg?`<span class="stars">${stars(avg)}</span> <span>${avg.toFixed(1)}</span>`:`<span>口コミなし</span>`}
+            <span>📍 ${(p.checkins||[]).length}</span>
+            <span>${(p.address||"").slice(0,16)}</span>
+          </div>
+        </div>`;
+      cards.appendChild(a);
+    });
+  }
+  render();
+  mountNav("list");
+</script>
+</body>
+</html>

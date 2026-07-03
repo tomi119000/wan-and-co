@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>マップ — Wan &amp; Co.</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">🐾</div>
+        <div>
+          <h1>Wan &amp; Co.</h1>
+          <div class="sub">Dog-friendly map</div>
+        </div>
+      </div>
+      <button class="iconbtn" id="logout" title="ログアウト">⏻</button>
+    </header>
+
+    <div class="pad" style="padding-bottom:10px">
+      <div class="chips" id="cats"></div>
+    </div>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <button class="locate-btn" id="locate" title="現在地">📍</button>
+    </div>
+
+    <div class="pad">
+      <div class="eyebrow">NEARBY</div>
+      <h2 class="section">近くのスポット <span class="sans" style="font-size:14px;color:var(--muted)" id="count"></span></h2>
+      <div id="cards"></div>
+    </div>
+  </div>
+
+<script src="assets/config.js"></script>
+<script src="assets/maps.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  if (!Auth.requireLogin()) throw "redirect";
+  const user = Auth.currentUser();
+  $("#logout").addEventListener("click", () => Auth.logout());
+
+  let activeCat = "all";
+  let map = null;
+
+  /* ---- category chips ---- */
+  const catsEl = $("#cats");
+  CATEGORIES.forEach(c => {
+    const b = document.createElement("button");
+    b.className = "chip" + (c.key === "all" ? " active" : "");
+    b.textContent = `${c.icon} ${c.label}`;
+    b.onclick = () => { activeCat = c.key; $$(".chip", catsEl).forEach(x => x.classList.remove("active")); b.classList.add("active"); render(); };
+    catsEl.appendChild(b);
+  });
+
+  /* ---- map (Google Maps API / Leaflet fallback) ---- */
+  WCMap.ready().then(() => {
+    map = WCMap.create("map", { interactive: true });
+    render();
+  });
+
+  function filtered() {
+    return Store.visible(user).filter(p => activeCat === "all" || p.category === activeCat);
+  }
+
+  function render() {
+    // markers
+    if (map) {
+      map.clearMarkers();
+      filtered().forEach(p => {
+        if (p.lat == null) return;
+        map.addMarker({ lat: p.lat, lng: p.lng }, {
+          title: p.name,
+          html: `<b>${p.name}</b><br>${catLabel(p.category)}<br>
+            <a href="place.html?id=${p.id}" style="color:#b48b46">詳細を見る →</a>`,
+        });
+      });
+    }
+    const list = filtered();
+
+    // cards
+    $("#count").textContent = `（${list.length}件）`;
+    const cards = $("#cards"); cards.innerHTML = "";
+    if (!list.length) { cards.innerHTML = `<div class="empty"><div class="big">🐾</div>このカテゴリのスポットはまだありません。</div>`; return; }
+    list.forEach(p => {
+      const avg = Store.avgRating(p);
+      const a = document.createElement("a");
+      a.href = `place.html?id=${p.id}`; a.className = "card place-card";
+      a.style.marginBottom = "16px"; a.style.display = "block";
+      const bg = (p.photos && p.photos[0]) ? `background-image:url('${p.photos[0]}')` : "background:#ded9cf";
+      a.innerHTML = `
+        <div class="thumb" style="${bg}">
+          <span class="badge">${catLabel(p.category)}</span>
+          ${p.visibility === "private" ? `<span class="lock">🔒 非公開</span>` : ""}
+        </div>
+        <div class="body">
+          <h3>${p.name}</h3>
+          <div class="meta">
+            ${avg ? `<span class="stars">${stars(avg)}</span> <span>${avg.toFixed(1)}</span>` : `<span>口コミなし</span>`}
+            <span>📍 ${(p.checkins||[]).length} チェックイン</span>
+            <span>${p.source === "google" ? "Google Maps掲載" : "ユーザー登録"}</span>
+          </div>
+        </div>`;
+      cards.appendChild(a);
+    });
+  }
+
+  /* ---- geolocation ---- */
+  $("#locate").addEventListener("click", () => {
+    if (!map) return;
+    if (!navigator.geolocation) return toast("位置情報が利用できません。");
+    toast("現在地を取得中…");
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        map.setView(loc, 15);
+        map.setYou(loc);
+      },
+      () => toast("現在地を取得できませんでした。"),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  });
+
+  mountNav("map");
+</script>
+</body>
+</html>

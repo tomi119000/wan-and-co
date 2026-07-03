@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wan &amp; Co. — 愛犬と、上質な場所へ</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="app" style="padding-bottom:0">
+  <div class="auth">
+    <div class="top">
+      <div class="mark">🐾</div>
+      <div class="eyebrow" style="color:var(--gold-2)">WAN &amp; CO.</div>
+      <h1>愛犬と、<br>上質な場所へ。</h1>
+      <p class="tag">DOG-FRIENDLY PLACES FOR CONNOISSEURS</p>
+    </div>
+
+    <div class="sheet">
+      <h2 class="section">ログイン</h2>
+      <form id="loginForm">
+        <div class="field">
+          <label for="email">メールアドレス（ID）</label>
+          <input type="email" id="email" autocomplete="username" placeholder="you@example.com" required>
+        </div>
+        <div class="field">
+          <label for="password">パスワード</label>
+          <input type="password" id="password" autocomplete="current-password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary">ログイン</button>
+      </form>
+
+      <div class="divider">はじめての方はこちら</div>
+      <a href="signup.html" class="btn btn-ghost">新規アカウント登録</a>
+
+      <p class="switch" style="margin-top:22px">
+        デモ用に <a href="#" id="demoLogin">ゲストとして体験する</a>
+      </p>
+    </div>
+  </div>
+  </div>
+
+<script src="assets/app.js"></script>
+<script>
+  // already logged in? go to map
+  if (Auth.currentUser()) location.href = "map.html";
+
+  $("#loginForm").addEventListener("submit", e => {
+    e.preventDefault();
+    try {
+      Auth.login({ email: $("#email").value.trim(), password: $("#password").value });
+      location.href = "map.html";
+    } catch (err) { toast(err.message); }
+  });
+
+  // demo guest: create/login a sample account instantly
+  $("#demoLogin").addEventListener("click", e => {
+    e.preventDefault();
+    const cred = { name: "体験ユーザー", email: "guest@demo.jp", password: "demo1234" };
+    try { Auth.login(cred); } catch { Auth.signup(cred); }
+    location.href = "map.html";
+  });
+</script>
+</body>
+</html>

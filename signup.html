@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>新規登録 — Wan &amp; Co.</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="app" style="padding-bottom:0">
+  <div class="auth">
+    <div class="top">
+      <div class="mark">🐾</div>
+      <div class="eyebrow" style="color:var(--gold-2)">WAN &amp; CO.</div>
+      <h1>ようこそ。</h1>
+      <p class="tag">愛犬とのお出かけを、もっと特別に。</p>
+    </div>
+
+    <div class="sheet">
+      <h2 class="section">新規アカウント登録</h2>
+      <form id="signupForm">
+        <div class="field">
+          <label for="name">お名前 / ニックネーム</label>
+          <input type="text" id="name" placeholder="山田 太郎" required>
+        </div>
+        <div class="field">
+          <label for="email">メールアドレス（ID）</label>
+          <input type="email" id="email" autocomplete="username" placeholder="you@example.com" required>
+        </div>
+        <div class="field">
+          <label for="password">パスワード（8文字以上）</label>
+          <input type="password" id="password" autocomplete="new-password" minlength="8" placeholder="••••••••" required>
+          <p class="hint">デモ版では入力情報はお使いの端末内にのみ保存されます。</p>
+        </div>
+        <button type="submit" class="btn btn-gold">登録して始める</button>
+      </form>
+      <p class="switch">すでにアカウントをお持ちですか？ <a href="index.html">ログイン</a></p>
+    </div>
+  </div>
+  </div>
+
+<script src="assets/app.js"></script>
+<script>
+  $("#signupForm").addEventListener("submit", e => {
+    e.preventDefault();
+    try {
+      Auth.signup({
+        name: $("#name").value.trim(),
+        email: $("#email").value.trim(),
+        password: $("#password").value,
+      });
+      location.href = "map.html";
+    } catch (err) { toast(err.message); }
+  });
+</script>
+</body>
+</html>

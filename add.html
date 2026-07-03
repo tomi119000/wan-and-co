@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>スポットを登録 — Wan &amp; Co.</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a href="map.html" class="backlink">‹ 戻る</a>
+      <div class="sub">New spot</div>
+    </header>
+
+    <div class="pad">
+      <div class="eyebrow">CREATE</div>
+      <h2 class="section">スポットを登録</h2>
+      <p class="lead sans">Google マップにない、愛犬と行けるお気に入りの場所を追加できます。</p>
+
+      <form id="form">
+        <div class="field">
+          <label for="name">施設名 <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="name" placeholder="例）南青山 ドッグテラス" required>
+        </div>
+
+        <div class="field">
+          <label for="category">カテゴリー</label>
+          <select id="category">
+            <option value="cafe">☕ カフェ・飲食店</option>
+            <option value="hotel">🛎 宿泊施設</option>
+            <option value="park">🌳 公園・ドッグラン</option>
+            <option value="shop">🛍 ショップ</option>
+            <option value="other">✦ その他</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="address">住所 / エリア</label>
+          <input type="text" id="address" placeholder="東京都港区南青山…">
+        </div>
+
+        <div class="field">
+          <label>場所（地図をタップして位置を指定）</label>
+          <div class="card" style="margin-top:6px"><div id="pick" style="height:220px"></div></div>
+          <p class="hint">「現在地を使う」でいまいる場所を登録できます。</p>
+          <button type="button" class="btn btn-ghost btn-sm" id="useLoc" style="margin-top:8px">📍 現在地を使う</button>
+        </div>
+
+        <div class="field">
+          <label>写真をアップロード</label>
+          <label class="photo-drop" for="photos">
+            <span class="big">📷</span>
+            タップして写真を選択（複数可）
+          </label>
+          <input class="photo-input" type="file" id="photos" accept="image/*" multiple>
+          <div class="preview-row" id="previews"></div>
+        </div>
+
+        <div class="field">
+          <label for="desc">コメント / 紹介文</label>
+          <textarea id="desc" placeholder="同伴ルールやおすすめポイントを入力…"></textarea>
+        </div>
+
+        <div class="field">
+          <label>公開設定</label>
+          <div class="seg">
+            <label><input type="radio" name="vis" value="public" checked><span>🌐 公開<br><small class="sans" style="color:var(--muted)">みんなに共有</small></span></label>
+            <label><input type="radio" name="vis" value="private"><span>🔒 非公開<br><small class="sans" style="color:var(--muted)">自分だけ</small></span></label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-gold">この場所を登録する</button>
+      </form>
+    </div>
+  </div>
+
+<script src="assets/config.js"></script>
+<script src="assets/maps.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  if (!Auth.requireLogin()) throw "redirect";
+  const user = Auth.currentUser();
+  let picked = null, photos = [], map = null;
+
+  function setPoint(lat, lng) {
+    picked = [lat, lng];
+    if (!map) return;
+    map.clearMarkers();
+    map.addMarker({ lat, lng }, { title: "選択した場所" });
+  }
+
+  WCMap.ready().then(() => {
+    map = WCMap.create("pick", { interactive: true });
+    map.onClick(({ lat, lng }) => setPoint(lat, lng));
+    if (picked) setPoint(picked[0], picked[1]);
+  });
+
+  $("#useLoc").addEventListener("click", () => {
+    if (!navigator.geolocation) return toast("位置情報が利用できません。");
+    toast("現在地を取得中…");
+    navigator.geolocation.getCurrentPosition(
+      pos => { const la=pos.coords.latitude, ln=pos.coords.longitude; if(map)map.setView({lat:la,lng:ln},16); setPoint(la,ln); toast("現在地を設定しました。"); },
+      () => toast("現在地を取得できませんでした。"), { enableHighAccuracy:true, timeout:8000 }
+    );
+  });
+
+  // photo previews
+  $("#photos").addEventListener("change", async e => {
+    for (const f of e.target.files) {
+      if (photos.length >= 6) { toast("写真は最大6枚までです。"); break; }
+      photos.push(await fileToDataURL(f));
+    }
+    e.target.value = "";
+    renderPreviews();
+  });
+  function renderPreviews() {
+    const row = $("#previews"); row.innerHTML = "";
+    photos.forEach((src, i) => {
+      const d = document.createElement("div"); d.className = "pv";
+      d.innerHTML = `<img src="${src}"><button type="button" aria-label="削除">×</button>`;
+      d.querySelector("button").onclick = () => { photos.splice(i,1); renderPreviews(); };
+      row.appendChild(d);
+    });
+  }
+
+  $("#form").addEventListener("submit", e => {
+    e.preventDefault();
+    const place = {
+      name: $("#name").value.trim(),
+      category: $("#category").value,
+      address: $("#address").value.trim(),
+      desc: $("#desc").value.trim(),
+      photos,
+      lat: picked ? picked[0] : null,
+      lng: picked ? picked[1] : null,
+      visibility: document.querySelector('input[name="vis"]:checked').value,
+    };
+    const rec = Store.add(place, user);
+    toast("スポットを登録しました！🎉");
+    setTimeout(() => location.href = `place.html?id=${rec.id}`, 700);
+  });
+
+  mountNav("add");
+</script>
+</body>
+</html>

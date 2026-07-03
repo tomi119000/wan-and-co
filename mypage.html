@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>マイページ — Wan &amp; Co.</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">🐾</div>
+        <div><h1>マイページ</h1><div class="sub">My page</div></div>
+      </div>
+      <button class="iconbtn" id="logout" title="ログアウト">⏻</button>
+    </header>
+
+    <div class="pad">
+      <div class="card pad" style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div class="review" style="padding:0;border:none">
+          <div class="avatar" style="width:60px;height:60px;font-size:24px" id="av"></div>
+        </div>
+        <div>
+          <div class="eyebrow" style="margin-bottom:2px">MEMBER</div>
+          <div style="font-size:20px" id="uname"></div>
+          <div class="sans" style="font-size:13px;color:var(--muted)" id="uemail"></div>
+        </div>
+      </div>
+
+      <div class="stat-row" style="margin-bottom:24px">
+        <div class="stat"><div class="num" id="sPlaces">0</div><div class="lbl">登録スポット</div></div>
+        <div class="stat"><div class="num" id="sCheck">0</div><div class="lbl">チェックイン</div></div>
+        <div class="stat"><div class="num" id="sRev">0</div><div class="lbl">投稿口コミ</div></div>
+      </div>
+
+      <div class="eyebrow">MY SPOTS</div>
+      <h2 class="section">登録したスポット</h2>
+      <div id="mine"></div>
+    </div>
+  </div>
+
+<script src="assets/app.js"></script>
+<script>
+  if (!Auth.requireLogin()) throw "redirect";
+  const user = Auth.currentUser();
+  $("#logout").addEventListener("click", () => Auth.logout());
+
+  $("#av").textContent = (user.name||"?")[0];
+  $("#uname").textContent = user.name;
+  $("#uemail").textContent = user.email;
+
+  function render() {
+    const all = Store.all();
+    const mine = all.filter(p => p.ownerId === user.id);
+    const myCheckins = all.reduce((n,p)=> n + (p.checkins||[]).filter(c=>c.userId===user.id).length, 0);
+    const myReviews  = all.reduce((n,p)=> n + (p.reviews||[]).filter(r=>r.userId===user.id).length, 0);
+
+    $("#sPlaces").textContent = mine.length;
+    $("#sCheck").textContent  = myCheckins;
+    $("#sRev").textContent    = myReviews;
+
+    const box = $("#mine"); box.innerHTML = "";
+    if (!mine.length) {
+      box.innerHTML = `<div class="empty"><div class="big">🐾</div>まだ登録がありません。<br>お気に入りの場所を追加しましょう。<br><br><a class="btn btn-gold" href="add.html" style="max-width:240px;margin:0 auto">＋ スポットを登録</a></div>`;
+      return;
+    }
+    mine.forEach(p => {
+      const bg = (p.photos&&p.photos[0])?`background-image:url('${p.photos[0]}')`:"background:#ded9cf";
+      const card = document.createElement("div"); card.className = "card"; card.style.marginBottom="16px";
+      card.innerHTML = `
+        <a href="place.html?id=${p.id}" class="place-card">
+          <div class="thumb" style="${bg}">
+            <span class="badge">${catLabel(p.category)}</span>
+            ${p.visibility==="private"?`<span class="lock">🔒 非公開</span>`:""}
+          </div>
+          <div class="body">
+            <h3>${p.name}</h3>
+            <div class="meta"><span>📍 ${(p.checkins||[]).length} チェックイン</span><span>💬 ${(p.reviews||[]).length}</span></div>
+          </div>
+        </a>
+        <div class="pad" style="padding-top:0;display:flex;gap:10px">
+          <button class="btn btn-ghost btn-sm toggle" data-id="${p.id}" style="flex:1">
+            ${p.visibility==="public"?"🔒 非公開にする":"🌐 公開する"}
+          </button>
+          <button class="btn btn-danger btn-sm del" data-id="${p.id}">削除</button>
+        </div>`;
+      box.appendChild(card);
+    });
+
+    $$(".toggle").forEach(b => b.onclick = () => {
+      const list = Store.all(); const p = list.find(x=>x.id===b.dataset.id);
+      p.visibility = p.visibility === "public" ? "private" : "public";
+      Store.save(list); toast(p.visibility==="public"?"公開しました。":"非公開にしました。"); render();
+    });
+    $$(".del").forEach(b => b.onclick = () => {
+      if (!confirm("このスポットを削除しますか？")) return;
+      Store.save(Store.all().filter(x=>x.id!==b.dataset.id));
+      toast("削除しました。"); render();
+    });
+  }
+  render();
+  mountNav("my");
+</script>
+</body>
+</html>
