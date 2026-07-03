@@ -95,13 +95,15 @@
         try {
           const { places } = await Place.searchByText({
             textQuery: q,
-            fields: ["id", "displayName", "location", "formattedAddress", "types", "primaryType"],
+            fields: ["id", "displayName", "location", "formattedAddress", "types", "primaryType", "photos"],
             locationBias: { center, radius: radiusMeters },
             maxResultCount: 8,
             language: "ja", region: "jp",
           });
           (places || []).forEach(p => {
             if (!p.location) return;
+            let photoUrl = "";
+            try { if (p.photos && p.photos[0]) photoUrl = p.photos[0].getURI({ maxWidthPx: 1000 }); } catch (e) {}
             seen.set(p.id, {
               placeId: p.id,
               name: (typeof p.displayName === "string" ? p.displayName : (p.displayName && p.displayName.text)) || "名称不明",
@@ -109,6 +111,7 @@
               lat: p.location.lat(), lng: p.location.lng(),
               types: p.types || [],
               primaryType: p.primaryType || "",
+              photoUrl: photoUrl,
             });
           });
         } catch (e) { /* 個々のクエリ失敗は無視して続行 */ }

@@ -136,7 +136,7 @@
         if (list.some(p => p.id === id)) return id;
         list.unshift({ id, source: "places", ownerId: cur ? cur.id : null, ownerName: "Google Places",
           name: g.name, category: catFromTypes(g.types, g.primaryType), address: g.address || "", desc: "",
-          lat: g.lat, lng: g.lng, visibility: "public", photos: [], checkins: [], reviews: [], createdAt: Date.now() });
+          lat: g.lat, lng: g.lng, visibility: "public", photos: g.photoUrl ? [g.photoUrl] : [], checkins: [], reviews: [], createdAt: Date.now() });
         saveAll(list); return id;
       },
       async addReview(id, { rating, text }) {
@@ -288,9 +288,10 @@
         await ref.set({
           source: "places", ownerId: cur.id, ownerName: "Google Places", placeId: g.placeId,
           name: g.name, category: catFromTypes(g.types, g.primaryType), address: g.address || "",
-          desc: "", lat: g.lat, lng: g.lng, visibility: "public", cover: "",
+          desc: "", lat: g.lat, lng: g.lng, visibility: "public", cover: g.photoUrl || "",
           checkinCount: 0, reviewCount: 0, ratingSum: 0, createdAt: FS.FieldValue.serverTimestamp(),
         });
+        if (g.photoUrl) await ref.collection("photos").add({ url: g.photoUrl, at: FS.FieldValue.serverTimestamp() });
         return id;
       },
       async addReview(id, { rating, text }) {

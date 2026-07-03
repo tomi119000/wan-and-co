@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260703a">
+<link rel="stylesheet" href="assets/style.css?v=20260703b">
 </head>
 <body>
   <div class="app">
@@ -39,10 +39,10 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20260703a"></script>
-<script src="assets/data.js?v=20260703a"></script>
-<script src="assets/maps.js?v=20260703a"></script>
-<script src="assets/app.js?v=20260703a"></script>
+<script src="assets/config.js?v=20260703b"></script>
+<script src="assets/data.js?v=20260703b"></script>
+<script src="assets/maps.js?v=20260703b"></script>
+<script src="assets/app.js?v=20260703b"></script>
 <script>
   let activeCat = "all", map = null, places = [];
 
@@ -67,7 +67,7 @@
     WCMap.ready().then(() => {
       map = WCMap.create("map", { interactive: true });
       render();
-      if (WCMap.canSearch) $("#findBtn").style.display = "flex"; // Google Maps モードのみ
+      if (WCMap.canSearch) { $("#findBtn").style.display = "flex"; restoreDiscovery(); } // Google Maps モードのみ
     });
     render();
   })();
@@ -83,6 +83,37 @@
     catch (e) { toast("取り込みに失敗しました。"); }
   };
 
+  // 発見マーカー（黒ピン）を描画。render() から毎回呼ばれるので、
+  // カテゴリ切替や詳細からの「戻る」でも残り続ける。
+  function addFindMarkers() {
+    if (!map) return;
+    findResults.forEach((g, i) => {
+      map.addMarker({ lat: g.lat, lng: g.lng }, {
+        pin: "find", title: g.name,
+        html: `<div style="min-width:190px;font-family:sans-serif">
+            <b style="font-size:14px">${escapeHtml(g.name)}</b><br>
+            <span style="color:#7d7a72;font-size:12px">${escapeHtml(g.address || "")}</span><br>
+            <button onclick="__wcImport(${i})" style="margin-top:8px;background:#1c1f26;color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px">この施設で口コミ・チェックイン</button>
+          </div>`,
+      });
+    });
+  }
+
+  // 検索結果を保存／復元（詳細ページから戻っても黒ピンを保持）
+  function saveDiscovery() {
+    try { sessionStorage.setItem("wc_discovery", JSON.stringify({ results: findResults, center: map.center(), ts: Date.now() })); } catch (e) {}
+  }
+  function restoreDiscovery() {
+    try {
+      const raw = sessionStorage.getItem("wc_discovery"); if (!raw) return;
+      const d = JSON.parse(raw);
+      if (!d.results || !d.results.length || (Date.now() - d.ts) > 30 * 60 * 1000) return;
+      findResults = d.results.filter(g => !places.some(p => p.id === gpId(g.placeId)));
+      if (d.center && map) map.setView(d.center, 14);
+      render(); // 黒ピンを再描画
+    } catch (e) {}
+  }
+
   $("#findBtn").addEventListener("click", async () => {
     if (!map || !WCMap.canSearch) return;
     const btn = $("#findBtn"); btn.disabled = true; btn.textContent = "検索中…";
@@ -90,17 +121,8 @@
       const results = await WCMap.searchDogFriendly(map.center(), 4000);
       // 既に登録済みの施設は除外
       findResults = results.filter(g => !places.some(p => p.id === gpId(g.placeId)));
-      render(); // ベースのマーカーを描き直してから発見マーカーを重ねる
-      findResults.forEach((g, i) => {
-        map.addMarker({ lat: g.lat, lng: g.lng }, {
-          pin: "find", title: g.name,
-          html: `<div style="min-width:190px;font-family:sans-serif">
-              <b style="font-size:14px">${escapeHtml(g.name)}</b><br>
-              <span style="color:#7d7a72;font-size:12px">${escapeHtml(g.address || "")}</span><br>
-              <button onclick="__wcImport(${i})" style="margin-top:8px;background:#1c1f26;color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px">この施設で口コミ・チェックイン</button>
-            </div>`,
-        });
-      });
+      saveDiscovery();
+      render(); // ベース＋発見マーカーを描画
       toast(findResults.length ? `${findResults.length}件の候補が見つかりました🐾` : "このエリアでは候補が見つかりませんでした");
     } catch (e) {
       toast(e.message || "検索に失敗しました。");
@@ -123,6 +145,7 @@
         });
       });
     }
+    addFindMarkers(); // 発見マーカー（黒ピン）を base マーカーの上に重ねる
     $("#count").textContent = `（${list.length}件）`;
     const cards = $("#cards"); cards.innerHTML = "";
     if (!list.length) { cards.innerHTML = `<div class="empty"><div class="big">🐾</div>このカテゴリのスポットはまだありません。</div>`; return; }
