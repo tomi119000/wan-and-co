@@ -73,6 +73,8 @@
         clearMarkers() { markers.forEach(m => m.setMap(null)); markers = []; },
         setView(pos, zoom) { map.setCenter(pos); if (zoom) map.setZoom(zoom); },
         onClick(fn) { map.addListener("click", e => fn({ lat: e.latLng.lat(), lng: e.latLng.lng() })); },
+        onIdle(fn) { map.addListener("idle", fn); },
+        inBounds(lat, lng) { const b = map.getBounds(); return b ? b.contains(new google.maps.LatLng(lat, lng)) : true; },
         setYou(pos) {
           if (you) you.setMap(null);
           you = new google.maps.Marker({
@@ -210,6 +212,8 @@
         clearMarkers() { markers.forEach(m => map.removeLayer(m)); markers = []; },
         setView(pos, zoom) { map.setView([pos.lat, pos.lng], zoom || map.getZoom()); },
         onClick(fn) { map.on("click", e => fn({ lat: e.latlng.lat, lng: e.latlng.lng })); },
+        onIdle(fn) { map.on("moveend", fn); },
+        inBounds(lat, lng) { try { return map.getBounds().contains(L.latLng(lat, lng)); } catch (e) { return true; } },
         setYou(pos) {
           if (you) map.removeLayer(you);
           you = L.circleMarker([pos.lat, pos.lng], { radius: 9, color: "#b48b46", fillColor: "#caa45f", fillOpacity: .9, weight: 3 })

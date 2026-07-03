@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704a">
+<link rel="stylesheet" href="assets/style.css?v=20260704b">
 </head>
 <body>
   <div class="app">
@@ -39,10 +39,10 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20260704a"></script>
-<script src="assets/data.js?v=20260704a"></script>
-<script src="assets/maps.js?v=20260704a"></script>
-<script src="assets/app.js?v=20260704a"></script>
+<script src="assets/config.js?v=20260704b"></script>
+<script src="assets/data.js?v=20260704b"></script>
+<script src="assets/maps.js?v=20260704b"></script>
+<script src="assets/app.js?v=20260704b"></script>
 <script>
   let activeCat = "all", map = null, places = [];
 
@@ -67,6 +67,7 @@
     WCMap.ready().then(() => {
       map = WCMap.create("map", { interactive: true });
       render();
+      if (map.onIdle) map.onIdle(() => renderCards()); // 地図を動かすとリストも追従
       if (WCMap.canSearch) { $("#findBtn").style.display = "flex"; restoreDiscovery(); } // Google Maps モードのみ
     });
     render();
@@ -146,11 +147,18 @@
 
   function filtered() { return places.filter(p => activeCat === "all" || p.category === activeCat); }
 
+  // 地図に表示されている範囲内か（＝ピンが見えているか）
+  function inView(lat, lng) {
+    if (!map || !map.inBounds) return true; // 地図準備前は全件
+    if (lat == null) return false;           // 位置情報が無い＝ピンが無い
+    return map.inBounds(lat, lng);
+  }
+
   function render() {
-    const list = filtered();
+    // マーカー（カテゴリで絞り込み。範囲外のピンは画面外なので自然に非表示）
     if (map) {
       map.clearMarkers();
-      list.forEach(p => {
+      filtered().forEach(p => {
         if (p.lat == null) return;
         map.addMarker({ lat: p.lat, lng: p.lng }, {
           title: p.name,
@@ -160,14 +168,21 @@
       });
     }
     addFindMarkers(); // 発見マーカー（黒ピン）を base マーカーの上に重ねる
+    renderCards();
+  }
 
-    const disc = filteredDiscovery(); // 検索でピンが立った施設
-    $("#count").textContent = `（${list.length + disc.length}件）`;
+  // 「近くのスポット」は、地図に表示されている範囲（＝ピンが見える範囲）の施設だけを表示
+  function renderCards() {
+    const reg = filtered().filter(p => inView(p.lat, p.lng));
+    const disc = filteredDiscovery().filter(({ g }) => inView(g.lat, g.lng));
+    $("#count").textContent = `（${reg.length + disc.length}件）`;
     const cards = $("#cards"); cards.innerHTML = "";
-    if (!list.length && !disc.length) { cards.innerHTML = `<div class="empty"><div class="big">🐾</div>このカテゴリのスポットはまだありません。</div>`; return; }
-
+    if (!reg.length && !disc.length) {
+      cards.innerHTML = `<div class="empty"><div class="big">🐾</div>この範囲にスポットがありません。<br>地図を動かすか、上の検索をお試しください。</div>`;
+      return;
+    }
     // 登録済みスポット（詳細ページへ）
-    list.forEach(p => {
+    reg.forEach(p => {
       const a = document.createElement("a");
       a.href = `place.html?id=${p.id}`; a.className = "card place-card";
       a.style.marginBottom = "16px"; a.style.display = "block";
