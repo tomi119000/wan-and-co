@@ -222,7 +222,8 @@
       async mine() {
         await bootstrap; if (!cur) return [];
         const snap = await db.collection("places").where("ownerId", "==", cur.id).get();
-        return snap.docs.map(d => summary(d.id, d.data()));
+        // 自分で登録したスポットのみ（初回シードの「Google Map掲載」施設は除外）
+        return snap.docs.filter(d => d.data().source === "user").map(d => summary(d.id, d.data()));
       },
       async get(id) { await bootstrap; const doc = await db.collection("places").doc(id).get(); return doc.exists ? summary(doc.id, doc.data()) : null; },
       async detail(id) {
@@ -292,18 +293,20 @@
       const marker = db.collection("meta").doc("seeded_v1");
       const m = await marker.get(); if (m.exists) return;
       const batch = db.batch();
+      // ownerId / userId は最初にログインしたユーザーに紐付ける（セキュリティルールを満たすため）。
+      // ただし source:"google" として扱い、本人の「マイページ」には表示しない（mine() で除外）。
       SEED.forEach(s => {
         const ref = db.collection("places").doc(s.id);
         batch.set(ref, {
-          source: "google", ownerId: null, ownerName: "Google Maps", name: s.name, category: s.category,
+          source: "google", ownerId: cur.id, ownerName: "Google Maps", name: s.name, category: s.category,
           address: s.address, desc: s.desc, lat: s.lat, lng: s.lng, visibility: "public",
           cover: (s.photos && s.photos[0]) || "", checkinCount: (s.checkins || []).length,
           reviewCount: (s.reviews || []).length, ratingSum: (s.reviews || []).reduce((a, b) => a + (b.rating || 0), 0),
           createdAt: FS.FieldValue.serverTimestamp(),
         }, { merge: true });
-        (s.photos || []).forEach((url, i) => batch.set(ref.collection("photos").doc("seed" + i), { url, at: FS.FieldValue.serverTimestamp() }));
-        (s.reviews || []).forEach((r, i) => batch.set(ref.collection("reviews").doc("seed" + i),
-          { userName: r.userName, rating: r.rating, text: r.text, at: FS.FieldValue.serverTimestamp() }));
+        (s.photos || []).forEach((url) => batch.set(ref.collection("photos").doc(), { url, at: FS.FieldValue.serverTimestamp() }));
+        (s.reviews || []).forEach((r) => batch.set(ref.collection("reviews").doc(),
+          { userId: cur.id, userName: r.userName, rating: r.rating, text: r.text, at: FS.FieldValue.serverTimestamp() }));
       });
       batch.set(marker, { at: FS.FieldValue.serverTimestamp() });
       await batch.commit();

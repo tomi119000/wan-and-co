@@ -27,16 +27,18 @@ service cloud.firestore {
       // 削除は所有者のみ
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
 
-      // 口コミ（誰でも閲覧・ログインユーザーが投稿）
+      // 口コミ（誰でも閲覧・ログインユーザーが投稿・投稿者本人が削除）
       match /reviews/{r} {
         allow read: if true;
         allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+        allow delete: if signedIn() && resource.data.userId == request.auth.uid;
       }
 
-      // 写真（誰でも閲覧・ログインユーザーが追加）
+      // 写真（誰でも閲覧・ログインユーザーが追加／削除）
       match /photos/{p} {
         allow read: if true;
         allow create: if signedIn();
+        allow delete: if signedIn();
       }
 
       // チェックイン（誰でも閲覧・本人のみ作成。ID = userId_YYYY-MM-DD で1日1回）

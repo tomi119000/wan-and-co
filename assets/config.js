@@ -35,11 +35,11 @@ window.WC_CONFIG = {
           → 表示される firebaseConfig の中身を下にコピー
      --------------------------------------------------------- */
   firebase: {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: "",
+    apiKey: "AIzaSyCG9rOBHbnWSuv4HEQor5Vz6Ab4hfMc-Us",
+    authDomain: "wan-and-co.firebaseapp.com",
+    projectId: "wan-and-co",
+    storageBucket: "wan-and-co.firebasestorage.app",
+    messagingSenderId: "510249838033",
+    appId: "1:510249838033:web:064d02eff33f67bdf22cf0",
   },
 };
