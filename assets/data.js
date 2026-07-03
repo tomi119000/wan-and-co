@@ -74,6 +74,7 @@
     return "other";
   }
   const placeDocId = pid => "gp_" + String(pid).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
+  window.catFromGoogleTypes = catFromTypes; // 検索結果のカテゴリー判定に利用
 
   /* =======================================================================
      LOCAL BACKEND (localStorage) — 端末内。データ共有なし。

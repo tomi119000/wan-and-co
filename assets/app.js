@@ -46,6 +46,7 @@ function placeCardHTML(p) {
     </div>
     <div class="body">
       <h3>${escapeHtml(p.name)}</h3>
+      ${p.desc ? `<p class="card-desc">${escapeHtml(p.desc)}</p>` : ""}
       <div class="meta">
         ${p.avg ? `<span class="stars">${stars(p.avg)}</span> <span>${p.avg.toFixed(1)}</span>` : `<span>口コミなし</span>`}
         <span>📍 ${p.checkinCount || 0} チェックイン</span>

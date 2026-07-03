@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260703c">
+<link rel="stylesheet" href="assets/style.css?v=20260704a">
 </head>
 <body>
   <div class="app">
@@ -39,10 +39,10 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20260703c"></script>
-<script src="assets/data.js?v=20260703c"></script>
-<script src="assets/maps.js?v=20260703c"></script>
-<script src="assets/app.js?v=20260703c"></script>
+<script src="assets/config.js?v=20260704a"></script>
+<script src="assets/data.js?v=20260704a"></script>
+<script src="assets/maps.js?v=20260704a"></script>
+<script src="assets/app.js?v=20260704a"></script>
 <script>
   let activeCat = "all", map = null, places = [];
 
@@ -83,11 +83,25 @@
     catch (e) { toast("取り込みに失敗しました。"); }
   };
 
+  const gCat = g => (window.catFromGoogleTypes ? window.catFromGoogleTypes(g.types, g.primaryType) : "other");
+  // カテゴリ絞り込みを反映した検索結果（元の index を保持）
+  function filteredDiscovery() {
+    return findResults.map((g, i) => ({ g, i })).filter(({ g }) => activeCat === "all" || gCat(g) === activeCat);
+  }
+  // 検索結果を「カード表示用の疑似スポット」に変換
+  function discoveryToPlace(g) {
+    return {
+      name: g.name, category: gCat(g), address: g.address, desc: g.desc || "",
+      cover: g.photoUrl || "", placeId: g.placeId, source: "places",
+      visibility: "public", checkinCount: 0, avg: null,
+    };
+  }
+
   // 発見マーカー（黒ピン）を描画。render() から毎回呼ばれるので、
   // カテゴリ切替や詳細からの「戻る」でも残り続ける。
   function addFindMarkers() {
     if (!map) return;
-    findResults.forEach((g, i) => {
+    filteredDiscovery().forEach(({ g, i }) => {
       map.addMarker({ lat: g.lat, lng: g.lng }, {
         pin: "find", title: g.name,
         html: `<div style="min-width:190px;font-family:sans-serif">
@@ -146,14 +160,27 @@
       });
     }
     addFindMarkers(); // 発見マーカー（黒ピン）を base マーカーの上に重ねる
-    $("#count").textContent = `（${list.length}件）`;
+
+    const disc = filteredDiscovery(); // 検索でピンが立った施設
+    $("#count").textContent = `（${list.length + disc.length}件）`;
     const cards = $("#cards"); cards.innerHTML = "";
-    if (!list.length) { cards.innerHTML = `<div class="empty"><div class="big">🐾</div>このカテゴリのスポットはまだありません。</div>`; return; }
+    if (!list.length && !disc.length) { cards.innerHTML = `<div class="empty"><div class="big">🐾</div>このカテゴリのスポットはまだありません。</div>`; return; }
+
+    // 登録済みスポット（詳細ページへ）
     list.forEach(p => {
       const a = document.createElement("a");
       a.href = `place.html?id=${p.id}`; a.className = "card place-card";
       a.style.marginBottom = "16px"; a.style.display = "block";
       a.innerHTML = placeCardHTML(p);
+      cards.appendChild(a);
+    });
+    // 検索でピンが立った未登録スポット（タップで取り込み→詳細へ）
+    disc.forEach(({ g, i }) => {
+      const a = document.createElement("a");
+      a.href = "#"; a.className = "card place-card";
+      a.style.marginBottom = "16px"; a.style.display = "block";
+      a.innerHTML = placeCardHTML(discoveryToPlace(g));
+      a.addEventListener("click", e => { e.preventDefault(); __wcImport(i); });
       cards.appendChild(a);
     });
     hydrateCardPhotos(cards); // 写真の無い施設は Places API から後埋め

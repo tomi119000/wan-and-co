@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット詳細 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260703c">
+<link rel="stylesheet" href="assets/style.css?v=20260704a">
 </head>
 <body>
   <div class="app">
@@ -15,10 +15,10 @@
     <div id="content"></div>
   </div>
 
-<script src="assets/config.js?v=20260703c"></script>
-<script src="assets/data.js?v=20260703c"></script>
-<script src="assets/maps.js?v=20260703c"></script>
-<script src="assets/app.js?v=20260703c"></script>
+<script src="assets/config.js?v=20260704a"></script>
+<script src="assets/data.js?v=20260704a"></script>
+<script src="assets/maps.js?v=20260704a"></script>
+<script src="assets/app.js?v=20260704a"></script>
 <script>
   const id = new URLSearchParams(location.search).get("id");
 
@@ -71,6 +71,8 @@
         <h3 class="section" style="font-size:18px;margin-top:26px">場所</h3>
         <div class="card"><div id="mini" style="height:200px"></div></div>
 
+        <div id="gReviewsWrap"></div>
+
         <h3 class="section" style="font-size:18px;margin-top:26px">口コミ（${p.reviewCount||0}）</h3>
         <div class="card pad" style="margin-bottom:16px">
           <div class="field" style="margin-bottom:12px">
@@ -97,6 +99,12 @@
       WCMap.ready().then(() => WCMap.fetchPhoto && WCMap.fetchPhoto(p.placeId)).then(url => {
         const hb = document.getElementById("heroBox"); if (hb && url) hb.style.backgroundImage = `url('${url}')`;
       }).catch(() => {});
+    }
+
+    // Google の口コミ（ワンちゃん関連を優先・投稿日付き）
+    if (p.placeId && window.WCMap && WCMap.ready) {
+      WCMap.ready().then(() => WCMap.fetchReviews && WCMap.fetchReviews(p.placeId))
+        .then(rv => renderGoogleReviews(rv || [])).catch(() => {});
     }
 
     // mini map (content was re-rendered, so #mini is a fresh node)
@@ -139,6 +147,32 @@
       catch (err) { toast("投稿に失敗しました。"); e.target.disabled = false; return; }
       await load();
     };
+  }
+
+  // Google 口コミの描画（ワンちゃん関連を優先・投稿年月日つき）
+  function renderGoogleReviews(rv) {
+    const wrap = document.getElementById("gReviewsWrap");
+    if (!wrap) return;
+    if (!rv || !rv.length) { wrap.innerHTML = ""; return; }
+    const fmt = ms => ms ? new Date(ms).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" }) : "";
+    wrap.innerHTML = `
+      <h3 class="section" style="font-size:18px;margin-top:26px">Googleの口コミ
+        <span class="sans" style="font-size:12px;color:var(--gold)">🐾 ワンちゃん関連を優先</span></h3>
+      <div class="card pad" style="margin-bottom:6px">
+        ${rv.map(r => `
+          <div class="review">
+            <div class="head">
+              <div class="avatar">${escapeHtml((r.author || "G")[0])}</div>
+              <div>
+                <div class="who">${escapeHtml(r.author)}${r.dog ? ' <span style="color:var(--gold)">🐾</span>' : ""}</div>
+                <div class="when">${fmt(r.dateMs) || escapeHtml(r.rel || "")}</div>
+              </div>
+            </div>
+            ${r.rating ? `<div class="stars">${stars(r.rating)}</div>` : ""}
+            <p class="text">${escapeHtml(r.text)}</p>
+          </div>`).join("")}
+      </div>
+      <p class="hint sans" style="margin:0 0 4px">出典: Google マップ</p>`;
   }
 </script>
 </body>

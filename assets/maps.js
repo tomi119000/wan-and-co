@@ -95,7 +95,7 @@
         try {
           const { places } = await Place.searchByText({
             textQuery: q,
-            fields: ["id", "displayName", "location", "formattedAddress", "types", "primaryType", "photos"],
+            fields: ["id", "displayName", "location", "formattedAddress", "types", "primaryType", "photos", "editorialSummary"],
             locationBias: { center, radius: radiusMeters },
             maxResultCount: 8,
             language: "ja", region: "jp",
@@ -104,6 +104,8 @@
             if (!p.location) return;
             let photoUrl = "";
             try { if (p.photos && p.photos[0]) photoUrl = p.photos[0].getURI({ maxWidthPx: 1000 }); } catch (e) {}
+            let desc = "";
+            try { const s = p.editorialSummary; desc = (typeof s === "string" ? s : (s && s.text)) || ""; } catch (e) {}
             seen.set(p.id, {
               placeId: p.id,
               name: (typeof p.displayName === "string" ? p.displayName : (p.displayName && p.displayName.text)) || "名称不明",
@@ -112,6 +114,7 @@
               types: p.types || [],
               primaryType: p.primaryType || "",
               photoUrl: photoUrl,
+              desc: desc,
             });
           });
         } catch (e) { /* 個々のクエリ失敗は無視して続行 */ }
@@ -134,6 +137,36 @@
       photoCache[placeId] = url;
       try { sessionStorage.setItem("wc_photo_" + placeId, url); } catch (e) {}
       return url;
+    };
+
+    /* place_id から Google の口コミを取得（ワンちゃん関連を優先・キャッシュ付き） */
+    const DOG_RE = /犬|いぬ|イヌ|わんこ|わんちゃん|ワンちゃん|ワンコ|愛犬|ペット|同伴|ドッグ|dog|puppy|pet/i;
+    const reviewCache = {};
+    WCMap.fetchReviews = async function (placeId) {
+      if (!placeId) return [];
+      if (reviewCache[placeId] !== undefined) return reviewCache[placeId];
+      let out = [];
+      try {
+        const place = new google.maps.places.Place({ id: placeId });
+        await place.fetchFields({ fields: ["reviews"] });
+        out = (place.reviews || []).map(r => {
+          const t = r.text; const text = (typeof t === "string" ? t : (t && t.text)) || "";
+          let dateMs = 0;
+          try { if (r.publishTime) dateMs = new Date(r.publishTime).getTime(); } catch (e) {}
+          return {
+            author: (r.authorAttribution && r.authorAttribution.displayName) || "Google ユーザー",
+            rating: r.rating || 0,
+            text: text,
+            dateMs: dateMs,
+            rel: r.relativePublishTimeDescription || "",
+            dog: DOG_RE.test(text),
+          };
+        });
+        // ワンちゃん関連を先頭に、その中で新しい順
+        out.sort((a, b) => (b.dog - a.dog) || (b.dateMs - a.dateMs));
+      } catch (e) { out = []; }
+      reviewCache[placeId] = out;
+      return out;
     };
 
     readyResolve();
