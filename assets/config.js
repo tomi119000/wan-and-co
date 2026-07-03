@@ -12,7 +12,7 @@
    =========================================================== */
 window.WC_CONFIG = {
   // 例: "AIzaSyD-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  GOOGLE_MAPS_API_KEY: "",
+  GOOGLE_MAPS_API_KEY: "AIzaSyBYSrIit3f_fdb5-hf4ba8NGreEbY97RrI",
 
   // 地図の初期表示位置（東京・中心部）
   DEFAULT_CENTER: { lat: 35.6720, lng: 139.7100 },
