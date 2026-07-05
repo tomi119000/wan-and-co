@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704c">
+<link rel="stylesheet" href="assets/style.css?v=20260704d">
 </head>
 <body>
   <div class="app">
@@ -40,10 +40,10 @@
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20260704c"></script>
-<script src="assets/data.js?v=20260704c"></script>
-<script src="assets/maps.js?v=20260704c"></script>
-<script src="assets/app.js?v=20260704c"></script>
+<script src="assets/config.js?v=20260704d"></script>
+<script src="assets/data.js?v=20260704d"></script>
+<script src="assets/maps.js?v=20260704d"></script>
+<script src="assets/app.js?v=20260704d"></script>
 <script>
   let activeCat = "all", map = null, places = [];
 
@@ -143,11 +143,23 @@
     const btn = $("#findBtn"); btn.disabled = true; btn.textContent = "検索中…";
     try {
       const results = await WCMap.searchDogFriendly(map.center(), 4000);
-      // 既に登録済みの施設は除外
-      findResults = results.filter(g => !places.some(p => p.id === gpId(g.placeId)));
-      saveDiscovery();
-      render(); // ベース＋発見マーカーを描画
-      toast(findResults.length ? `${findResults.length}件の候補が見つかりました🐾` : "このエリアでは候補が見つかりませんでした");
+      // 既にDB(places)に無いものだけ新規に自動保存
+      const fresh = results.filter(g => !places.some(p => p.id === gpId(g.placeId)));
+      btn.textContent = "保存中…";
+      const imported = await Promise.all(fresh.map(async g => {
+        try { return { g, id: await Store.importPlace(g) }; } catch (e) { return null; } // 重複は自動スキップ
+      }));
+      imported.filter(Boolean).forEach(({ g, id }) => places.push({
+        id, name: g.name, category: gCat(g), address: g.address, desc: g.desc || "",
+        cover: g.photoUrl || "", placeId: g.placeId, source: "places", visibility: "public",
+        checkinCount: 0, reviewCount: 0, avg: null, lat: g.lat, lng: g.lng,
+      }));
+      const added = imported.filter(Boolean).length;
+      render(); // 保存済みスポット（gold ピン）として表示
+      const dup = results.length - fresh.length;
+      toast(results.length
+        ? `${added}件を保存しました${dup ? `（${dup}件は登録済み）` : ""}🐾`
+        : "このエリアでは候補が見つかりませんでした");
     } catch (e) {
       toast(e.message || "検索に失敗しました。");
     }
