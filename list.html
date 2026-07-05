@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット一覧 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704e">
+<link rel="stylesheet" href="assets/style.css?v=20260704f">
 </head>
 <body>
   <div class="app">
@@ -16,20 +16,25 @@
     </header>
 
     <div class="pad">
-      <div class="field" style="margin-bottom:14px">
+      <div class="field" style="margin-bottom:12px">
         <input type="search" id="q" placeholder="🔍 施設名・エリアで検索">
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <select id="area">
+          <!-- エリア選択肢はJSで生成 -->
+        </select>
       </div>
       <div class="chips" id="cats" style="margin-bottom:16px"></div>
       <div id="cards"></div>
     </div>
   </div>
 
-<script src="assets/config.js?v=20260704e"></script>
-<script src="assets/data.js?v=20260704e"></script>
-<script src="assets/maps.js?v=20260704e"></script>
-<script src="assets/app.js?v=20260704e"></script>
+<script src="assets/config.js?v=20260704f"></script>
+<script src="assets/data.js?v=20260704f"></script>
+<script src="assets/maps.js?v=20260704f"></script>
+<script src="assets/app.js?v=20260704f"></script>
 <script>
-  let activeCat = "all", q = "", places = [];
+  let activeCat = "all", q = "", area = "all", places = [];
 
   const catsEl = $("#cats");
   CATEGORIES.forEach(c => {
@@ -39,6 +44,12 @@
     b.onclick = () => { activeCat = c.key; $$(".chip", catsEl).forEach(x=>x.classList.remove("active")); b.classList.add("active"); render(); };
     catsEl.appendChild(b);
   });
+
+  // エリア絞り込みドロップダウン
+  const areaEl = $("#area");
+  AREAS.forEach(a => { const o = document.createElement("option"); o.value = a.key; o.textContent = a.label; areaEl.appendChild(o); });
+  areaEl.addEventListener("change", e => { area = e.target.value; render(); });
+
   $("#q").addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); render(); });
 
   (async () => {
@@ -52,6 +63,7 @@
   function render() {
     const list = places.filter(p =>
       (activeCat === "all" || p.category === activeCat) &&
+      inArea(p, area) &&
       (!q || (p.name + " " + (p.address||"")).toLowerCase().includes(q))
     );
     const cards = $("#cards"); cards.innerHTML = "";

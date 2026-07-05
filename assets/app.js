@@ -23,14 +23,53 @@ function toast(msg) {
 }
 
 const CATEGORIES = [
-  { key: "all",   label: "すべて",     icon: "◈" },
-  { key: "cafe",  label: "カフェ・飲食", icon: "☕" },
-  { key: "hotel", label: "宿泊",       icon: "🛎" },
-  { key: "park",  label: "公園",       icon: "🌳" },
-  { key: "shop",  label: "ショップ",    icon: "🛍" },
-  { key: "other", label: "その他",     icon: "✦" },
+  { key: "all",    label: "すべて",     icon: "◈" },
+  { key: "cafe",   label: "カフェ・飲食", icon: "☕" },
+  { key: "hotel",  label: "宿泊",       icon: "🛎" },
+  { key: "park",   label: "公園",       icon: "🌳" },
+  { key: "shop",   label: "ショップ",    icon: "🛍" },
+  { key: "school", label: "スクール",    icon: "🎓" },  // ドッグトレーニング・しつけ
+  { key: "salon",  label: "サロン",     icon: "✂️" },  // トリミング
+  { key: "clinic", label: "動物病院",   icon: "🏥" },
+  { key: "other",  label: "その他",     icon: "✦" },
 ];
 const catLabel = k => (CATEGORIES.find(c => c.key === k) || {}).label || "その他";
+
+/* 住所から所在地概要を抽出（例: "〒150-0001 東京都渋谷区神宮前３丁目…" → "東京都渋谷区神宮前３丁目"） */
+function areaSummary(addr) {
+  if (!addr) return "";
+  let s = String(addr).replace(/〒?\s*\d{3}-?\d{4}\s*/, "").trim(); // 郵便番号を除去
+  s = s.replace(/^日本[、,]?\s*/, "");                              // 先頭の「日本」を除去
+  const m = s.match(/^(.*?[0-9０-９一二三四五六七八九十]+丁目)/);      // 丁目まで
+  if (m) return m[1];
+  return s.replace(/[0-9０-９].*$/, "").trim();                     // 番地以降を除去
+}
+
+/* 主要エリア（スポット画面のエリア絞り込み用・中心座標＋半径km） */
+const AREAS = [
+  { key: "all",        label: "すべてのエリア" },
+  { key: "minato",     label: "港区（南青山・白金・六本木）", lat: 35.658, lng: 139.732, r: 2.6 },
+  { key: "shibuya",    label: "渋谷・原宿・代官山",         lat: 35.661, lng: 139.703, r: 2.2 },
+  { key: "ebisu",      label: "恵比寿・中目黒",            lat: 35.646, lng: 139.708, r: 2.0 },
+  { key: "futako",     label: "二子玉川",                lat: 35.611, lng: 139.626, r: 2.2 },
+  { key: "jiyugaoka",  label: "自由が丘",                lat: 35.607, lng: 139.668, r: 1.8 },
+  { key: "shinjuku",   label: "新宿・代々木",             lat: 35.686, lng: 139.702, r: 2.4 },
+  { key: "marunouchi", label: "丸の内・東京",             lat: 35.681, lng: 139.767, r: 2.0 },
+  { key: "kichijoji",  label: "吉祥寺",                  lat: 35.703, lng: 139.580, r: 2.0 },
+];
+/* 2点間の距離(km)・簡易 */
+function distKm(a, b, c, d) {
+  const R = 6371, r = Math.PI / 180;
+  const dLat = (c - a) * r, dLng = (d - b) * r;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function inArea(p, areaKey) {
+  const a = AREAS.find(x => x.key === areaKey);
+  if (!a || a.key === "all") return true;
+  if (p.lat == null) return false;
+  return distKm(a.lat, a.lng, p.lat, p.lng) <= a.r;
+}
 const stars = n => "★★★★★☆☆☆☆☆".slice(5 - Math.round(n), 10 - Math.round(n));
 
 /* card markup shared by map / list / mypage */
@@ -52,6 +91,7 @@ function placeCardHTML(p, opts) {
     </div>
     <div class="body">
       <h3>${escapeHtml(p.name)}</h3>
+      ${p.address ? `<div class="card-loc">📍 ${escapeHtml(areaSummary(p.address))}</div>` : ""}
       ${p.desc ? `<p class="card-desc">${escapeHtml(p.desc)}</p>` : ""}
       <div class="meta">
         ${p.avg ? `<span class="stars">${stars(p.avg)}</span> <span>${p.avg.toFixed(1)}</span>` : `<span>口コミなし</span>`}

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポットを登録 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704e">
+<link rel="stylesheet" href="assets/style.css?v=20260704f">
 </head>
 <body>
   <div class="app">
@@ -31,6 +31,9 @@
             <option value="hotel">🛎 宿泊施設</option>
             <option value="park">🌳 公園・ドッグラン</option>
             <option value="shop">🛍 ショップ</option>
+            <option value="school">🎓 スクール（トレーニング・しつけ）</option>
+            <option value="salon">✂️ サロン（トリミング）</option>
+            <option value="clinic">🏥 動物病院</option>
             <option value="other">✦ その他</option>
           </select>
         </div>
@@ -75,10 +78,10 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20260704e"></script>
-<script src="assets/data.js?v=20260704e"></script>
-<script src="assets/maps.js?v=20260704e"></script>
-<script src="assets/app.js?v=20260704e"></script>
+<script src="assets/config.js?v=20260704f"></script>
+<script src="assets/data.js?v=20260704f"></script>
+<script src="assets/maps.js?v=20260704f"></script>
+<script src="assets/app.js?v=20260704f"></script>
 <script>
   let picked = null, files = [], map = null;
   (async () => { const u = await Data.ready(); if (!u) location.href = "index.html"; })();

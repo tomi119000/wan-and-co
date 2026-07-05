@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704e">
+<link rel="stylesheet" href="assets/style.css?v=20260704f">
 </head>
 <body>
   <div class="app">
@@ -40,10 +40,10 @@
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20260704e"></script>
-<script src="assets/data.js?v=20260704e"></script>
-<script src="assets/maps.js?v=20260704e"></script>
-<script src="assets/app.js?v=20260704e"></script>
+<script src="assets/config.js?v=20260704f"></script>
+<script src="assets/data.js?v=20260704f"></script>
+<script src="assets/maps.js?v=20260704f"></script>
+<script src="assets/app.js?v=20260704f"></script>
 <script>
   let activeCat = "all", map = null, places = [];
 
@@ -93,7 +93,7 @@
     catch (e) { toast("取り込みに失敗しました。"); }
   };
 
-  const gCat = g => (window.catFromGoogleTypes ? window.catFromGoogleTypes(g.types, g.primaryType) : "other");
+  const gCat = g => (window.catFromGoogleTypes ? window.catFromGoogleTypes(g.types, g.primaryType, g.name) : "other");
   // カテゴリ絞り込みを反映した検索結果（元の index を保持）
   function filteredDiscovery() {
     return findResults.map((g, i) => ({ g, i })).filter(({ g }) => activeCat === "all" || gCat(g) === activeCat);

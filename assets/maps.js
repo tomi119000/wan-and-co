@@ -91,7 +91,8 @@
       radiusMeters = radiusMeters || 4000;
       const Place = google.maps.places && google.maps.places.Place;
       if (!Place || !Place.searchByText) throw new Error("Places API (New) が利用できません。");
-      const queries = ["犬同伴 カフェ", "ドッグカフェ", "ドッグラン", "ペット可 レストラン"];
+      const queries = ["犬同伴 カフェ", "ドッグカフェ", "ドッグラン", "ペット可 レストラン",
+        "ドッグスクール しつけ教室", "トリミングサロン 犬"];
       const seen = new Map();
       for (const q of queries) {
         try {

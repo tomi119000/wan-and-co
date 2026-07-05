@@ -63,10 +63,15 @@
   const SEED = seedData();
   const avgOf = p => (p.reviewCount ? (p.ratingSum || 0) / p.reviewCount : null);
 
-  /* Google Places の types → アプリのカテゴリー */
-  function catFromTypes(types, primary) {
+  /* Google Places の types（＋施設名）→ アプリのカテゴリー */
+  function catFromTypes(types, primary, name) {
     const t = (primary ? [primary] : []).concat(types || []).map(x => String(x).toLowerCase());
     const has = k => t.some(x => x.includes(k));
+    const nm = String(name || "");
+    // 施設名のキーワードで細分類（Google types に無い区分を補う）
+    if (/トレーニング|しつけ|スクール|訓練|幼稚園|保育園|ドッグラン以外.*教室|dog ?training|obedience/i.test(nm)) return "school";
+    if (/トリミング|サロン|グルーミング|美容|trimming|grooming/i.test(nm)) return "salon";
+    if (/動物病院|獣医|クリニック|ペットクリニック|veterinary|animal ?hospital/i.test(nm) || has("veterinary")) return "clinic";
     if (has("lodging") || has("hotel")) return "hotel";
     if (has("dog_park") || has("park")) return "park";
     if (has("pet_store") || has("store") || has("shop")) return "shop";
@@ -136,7 +141,7 @@
         const id = placeDocId(g.placeId); const list = all();
         if (list.some(p => p.id === id)) return id;
         list.unshift({ id, source: "places", ownerId: cur ? cur.id : null, ownerName: "Google Places", placeId: g.placeId || "",
-          name: g.name, category: catFromTypes(g.types, g.primaryType), address: g.address || "", desc: "",
+          name: g.name, category: catFromTypes(g.types, g.primaryType, g.name), address: g.address || "", desc: "",
           lat: g.lat, lng: g.lng, visibility: "public", photos: g.photoUrl ? [g.photoUrl] : [], checkins: [], reviews: [], createdAt: Date.now() });
         saveAll(list); return id;
       },
@@ -295,7 +300,7 @@
         if (exists) return id;
         await ref.set({
           source: "places", ownerId: cur.id, ownerName: "Google Places", placeId: g.placeId,
-          name: g.name, category: catFromTypes(g.types, g.primaryType), address: g.address || "",
+          name: g.name, category: catFromTypes(g.types, g.primaryType, g.name), address: g.address || "",
           desc: "", lat: g.lat, lng: g.lng, visibility: "public", cover: g.photoUrl || "",
           checkinCount: 0, reviewCount: 0, ratingSum: 0, createdAt: FS.FieldValue.serverTimestamp(),
         });
