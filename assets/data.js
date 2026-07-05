@@ -80,7 +80,7 @@
      LOCAL BACKEND (localStorage) — 端末内。データ共有なし。
      ======================================================================= */
   function localBackend() {
-    const K = { USERS: "wc_users", SESSION: "wc_session", PLACES: "wc_places", SEEDED: "wc_seeded_v2" };
+    const K = { USERS: "wc_users", SESSION: "wc_session", PLACES: "wc_places", SEEDED: "wc_seeded_v2", SAVES: "wc_saves" };
     if (!read(K.SEEDED, false)) { write(K.PLACES, SEED.concat(read(K.PLACES, []))); write(K.SEEDED, true); }
 
     let cur = read(K.SESSION, null);
@@ -155,6 +155,13 @@
       },
       async setVisibility(id, vis) { const list = all(); const p = list.find(x => x.id === id); if (p) { p.visibility = vis; saveAll(list); } },
       async remove(id) { saveAll(all().filter(x => x.id !== id)); },
+
+      /* お気に入り（保存） */
+      async savedIds() { return read(K.SAVES, {})[cur ? cur.id : "_"] || []; },
+      async saveFavorite(id) { const m = read(K.SAVES, {}); const k = cur ? cur.id : "_"; const a = m[k] || []; if (a.indexOf(id) === -1) a.push(id); m[k] = a; write(K.SAVES, m); },
+      async unsaveFavorite(id) { const m = read(K.SAVES, {}); const k = cur ? cur.id : "_"; m[k] = (m[k] || []).filter(x => x !== id); write(K.SAVES, m); },
+      async saved() { const ids = await this.savedIds(); return all().filter(p => ids.indexOf(p.id) !== -1).map(summary); },
+
       async myStats() {
         const list = all();
         return {
@@ -319,6 +326,28 @@
       },
       async setVisibility(id, vis) { await bootstrap; await db.collection("places").doc(id).update({ visibility: vis }); },
       async remove(id) { await bootstrap; await db.collection("places").doc(id).delete(); },
+
+      /* お気に入り（保存）: users/{uid}.savedIds に配列で保持 */
+      async savedIds() {
+        await bootstrap; if (!cur) return [];
+        const u = await db.collection("users").doc(cur.id).get();
+        return (u.exists && u.data().savedIds) ? u.data().savedIds : [];
+      },
+      async saveFavorite(id) {
+        await bootstrap; if (!cur) return;
+        await db.collection("users").doc(cur.id).set({ savedIds: FS.FieldValue.arrayUnion(id) }, { merge: true });
+      },
+      async unsaveFavorite(id) {
+        await bootstrap; if (!cur) return;
+        await db.collection("users").doc(cur.id).set({ savedIds: FS.FieldValue.arrayRemove(id) }, { merge: true });
+      },
+      async saved() {
+        await bootstrap; if (!cur) return [];
+        const ids = await this.savedIds(); const out = [];
+        for (const id of ids) { try { const doc = await db.collection("places").doc(id).get(); if (doc.exists) out.push(summary(doc.id, doc.data())); } catch (e) {} }
+        return out;
+      },
+
       async myStats() {
         await bootstrap; if (!cur) return { places: 0, checkins: 0, reviews: 0 };
         const u = await db.collection("users").doc(cur.id).get();

@@ -34,15 +34,21 @@ const catLabel = k => (CATEGORIES.find(c => c.key === k) || {}).label || "その
 const stars = n => "★★★★★☆☆☆☆☆".slice(5 - Math.round(n), 10 - Math.round(n));
 
 /* card markup shared by map / list / mypage */
-function placeCardHTML(p) {
+function placeCardHTML(p, opts) {
+  opts = opts || {};
+  const showSave = opts.showSave !== false; // 既定で「保存」ボタンを表示
   // 写真が無く placeId がある施設は、あとで Places API から写真を後埋めする
   const needFetch = !p.cover && p.placeId;
   const thumbStyle = p.cover ? `background-image:url('${p.cover}')` : "background-color:#ded9cf";
   const fetchAttr = needFetch ? ` data-photo="${escapeHtml(p.placeId)}"` : "";
+  const saveBtn = showSave
+    ? `<button class="save-btn" data-id="${escapeHtml(p.id || "")}" data-pid="${escapeHtml(p.placeId || "")}" aria-label="保存">♡</button>`
+    : "";
   return `
     <div class="thumb"${fetchAttr} style="${thumbStyle}">
       <span class="badge">${catLabel(p.category)}</span>
       ${p.visibility === "private" ? `<span class="lock">🔒 非公開</span>` : ""}
+      ${saveBtn}
     </div>
     <div class="body">
       <h3>${escapeHtml(p.name)}</h3>
@@ -80,8 +86,41 @@ function mountNav(active) {
     <a href="map.html" data-k="map"><span class="ic">🗺</span>マップ</a>
     <a href="list.html" data-k="list"><span class="ic">≡</span>スポット</a>
     <a href="add.html" class="add" data-k="add"><span class="ic">＋</span>登録</a>
+    <a href="saved.html" data-k="saved"><span class="ic">♥</span>保存</a>
     <a href="mypage.html" data-k="my"><span class="ic">◔</span>マイページ</a>`;
   const a = nav.querySelector(`[data-k="${active}"]`);
   if (a) a.classList.add("active");
   document.body.appendChild(nav);
+}
+
+/* ---- 保存（お気に入り）ボタンの配線・トグル ---- */
+async function wireSaveButtons(root) {
+  if (!(window.Store && Store.savedIds)) return;
+  let savedSet = [];
+  try { savedSet = await Store.savedIds(); } catch (e) {}
+  $$(".save-btn", root || document).forEach(btn => {
+    const id = btn.dataset.id;
+    if (id && savedSet.indexOf(id) !== -1) { btn.classList.add("saved"); btn.textContent = "♥"; }
+    btn.onclick = e => { e.preventDefault(); e.stopPropagation(); toggleSave(btn); };
+  });
+}
+
+async function toggleSave(btn) {
+  if (btn._busy) return; btn._busy = true;
+  try {
+    let id = btn.dataset.id;
+    if (!id) { // 検索結果（未登録）はまず取り込んでから保存
+      const g = (window.__saveResolve && btn.dataset.pid) ? window.__saveResolve(btn.dataset.pid) : null;
+      if (!g) { toast("保存できませんでした。"); btn._busy = false; return; }
+      id = await Store.importPlace(g); btn.dataset.id = id;
+    }
+    if (btn.classList.contains("saved")) {
+      await Store.unsaveFavorite(id);
+      btn.classList.remove("saved"); btn.textContent = "♡"; toast("保存を解除しました。");
+    } else {
+      await Store.saveFavorite(id);
+      btn.classList.add("saved"); btn.textContent = "♥"; toast("保存しました ♥");
+    }
+  } catch (e) { toast("保存に失敗しました。"); }
+  btn._busy = false;
 }

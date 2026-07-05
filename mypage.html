@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マイページ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704b">
+<link rel="stylesheet" href="assets/style.css?v=20260704c">
 </head>
 <body>
   <div class="app">
@@ -40,9 +40,9 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20260704b"></script>
-<script src="assets/data.js?v=20260704b"></script>
-<script src="assets/app.js?v=20260704b"></script>
+<script src="assets/config.js?v=20260704c"></script>
+<script src="assets/data.js?v=20260704c"></script>
+<script src="assets/app.js?v=20260704c"></script>
 <script>
   let user = null;
   $("#logout").addEventListener("click", async () => { await Auth.logout(); location.href = "index.html"; });
@@ -76,7 +76,7 @@
     mine.forEach(p => {
       const card = document.createElement("div"); card.className = "card"; card.style.marginBottom="16px";
       card.innerHTML = `
-        <a href="place.html?id=${p.id}" class="place-card">${placeCardHTML(p)}</a>
+        <a href="place.html?id=${p.id}" class="place-card">${placeCardHTML(p, { showSave: false })}</a>
         <div class="pad" style="padding-top:0;display:flex;gap:10px">
           <button class="btn btn-ghost btn-sm toggle" data-id="${p.id}" data-vis="${p.visibility}" style="flex:1">
             ${p.visibility==="public"?"🔒 非公開にする":"🌐 公開する"}

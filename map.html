@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704b">
+<link rel="stylesheet" href="assets/style.css?v=20260704c">
 </head>
 <body>
   <div class="app">
@@ -38,11 +38,12 @@
       <div id="cards"></div>
     </div>
   </div>
+  <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20260704b"></script>
-<script src="assets/data.js?v=20260704b"></script>
-<script src="assets/maps.js?v=20260704b"></script>
-<script src="assets/app.js?v=20260704b"></script>
+<script src="assets/config.js?v=20260704c"></script>
+<script src="assets/data.js?v=20260704c"></script>
+<script src="assets/maps.js?v=20260704c"></script>
+<script src="assets/app.js?v=20260704c"></script>
 <script>
   let activeCat = "all", map = null, places = [];
 
@@ -73,9 +74,17 @@
     render();
   })();
 
+  /* スクロール可能なことを示すヒント（最初のスクロールで消す） */
+  window.addEventListener("scroll", () => {
+    const h = document.getElementById("scrollHint");
+    if (h) { h.style.opacity = "0"; setTimeout(() => h.remove(), 500); }
+  }, { once: true, passive: true });
+
   /* ---- Places API: 実在の犬同伴スポットを探す → 取り込み ---- */
   let findResults = [];
   const gpId = pid => "gp_" + String(pid).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 80);
+  // 保存ボタン用: placeId から検索結果を解決（未登録スポットの取り込みに使用）
+  window.__saveResolve = pid => findResults.find(g => g.placeId === pid);
 
   window.__wcImport = async (i) => {
     const g = findResults[i]; if (!g) return;
@@ -199,6 +208,7 @@
       cards.appendChild(a);
     });
     hydrateCardPhotos(cards); // 写真の無い施設は Places API から後埋め
+    wireSaveButtons(cards);   // 保存ボタンを配線
   }
 
   /* ---- geolocation ---- */
