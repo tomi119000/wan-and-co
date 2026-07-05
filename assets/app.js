@@ -72,13 +72,23 @@ function inArea(p, areaKey) {
 }
 const stars = n => "★★★★★☆☆☆☆☆".slice(5 - Math.round(n), 10 - Math.round(n));
 
+/* Google Maps/Places が有効か（config のキー有無）。無効時は課金を発生させない。 */
+const GOOGLE_ON = !!((((window.WC_CONFIG || {}).GOOGLE_MAPS_API_KEY) || "").trim());
+/* Google 写真URLは Place Photo として課金対象。Google無効時は読み込まない。 */
+function safeCover(cover) {
+  if (!cover) return "";
+  if (!GOOGLE_ON && /googleapis\.com|googleusercontent\.com/.test(cover)) return "";
+  return cover;
+}
+
 /* card markup shared by map / list / mypage */
 function placeCardHTML(p, opts) {
   opts = opts || {};
   const showSave = opts.showSave !== false; // 既定で「保存」ボタンを表示
-  // 写真が無く placeId がある施設は、あとで Places API から写真を後埋めする
-  const needFetch = !p.cover && p.placeId;
-  const thumbStyle = p.cover ? `background-image:url('${p.cover}')` : "background-color:#ded9cf";
+  const cover = safeCover(p.cover);
+  // 写真が無く placeId がある施設は、あとで Places API から写真を後埋めする（Google有効時のみ）
+  const needFetch = !cover && p.placeId && GOOGLE_ON;
+  const thumbStyle = cover ? `background-image:url('${cover}')` : "background-color:#ded9cf";
   const fetchAttr = needFetch ? ` data-photo="${escapeHtml(p.placeId)}"` : "";
   const saveBtn = showSave
     ? `<button class="save-btn" data-id="${escapeHtml(p.id || "")}" data-pid="${escapeHtml(p.placeId || "")}" aria-label="保存">♡</button>`

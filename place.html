@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット詳細 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704f">
+<link rel="stylesheet" href="assets/style.css?v=20260704g">
 </head>
 <body>
   <div class="app">
@@ -15,10 +15,10 @@
     <div id="content"></div>
   </div>
 
-<script src="assets/config.js?v=20260704f"></script>
-<script src="assets/data.js?v=20260704f"></script>
-<script src="assets/maps.js?v=20260704f"></script>
-<script src="assets/app.js?v=20260704f"></script>
+<script src="assets/config.js?v=20260704g"></script>
+<script src="assets/data.js?v=20260704g"></script>
+<script src="assets/maps.js?v=20260704g"></script>
+<script src="assets/app.js?v=20260704g"></script>
 <script>
   const id = new URLSearchParams(location.search).get("id");
 
@@ -43,7 +43,8 @@
   function render(d) {
     const p = d.place;
     $("#src").textContent = p.source === "user" ? "ユーザー登録" : "Google Map掲載";
-    const hero = (d.photos && d.photos[0]) || p.cover || "";
+    const hero = safeCover((d.photos && d.photos[0]) || p.cover || "");
+    const gallery = (d.photos || []).map(safeCover).filter(Boolean);
     $("#content").innerHTML = `
       ${hero ? `<img class="hero-img" src="${hero}" alt="">` : `<div class="hero-img" id="heroBox" style="background:#ded9cf center/cover no-repeat"></div>`}
       <div class="pad">
@@ -65,9 +66,9 @@
         <button class="btn btn-ghost" id="saveBtn" style="margin:0 0 6px">♡ 保存する</button>
         <p class="hint sans center">同伴ルールを守って、素敵な時間を。</p>
 
-        ${d.photos && d.photos.length > 1 ? `
+        ${gallery.length > 1 ? `
           <h3 class="section" style="font-size:18px;margin-top:24px">フォト</h3>
-          <div class="gallery">${d.photos.map(u=>`<img src="${u}" alt="">`).join("")}</div>` : ""}
+          <div class="gallery">${gallery.map(u=>`<img src="${u}" alt="">`).join("")}</div>` : ""}
 
         <h3 class="section" style="font-size:18px;margin-top:26px">場所</h3>
         <div class="card"><div id="mini" style="height:200px"></div></div>

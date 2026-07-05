@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット一覧 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704f">
+<link rel="stylesheet" href="assets/style.css?v=20260704g">
 </head>
 <body>
   <div class="app">
@@ -24,15 +24,16 @@
           <!-- エリア選択肢はJSで生成 -->
         </select>
       </div>
-      <div class="chips" id="cats" style="margin-bottom:16px"></div>
+      <div class="chips" id="cats" style="margin-bottom:14px"></div>
+      <h2 class="section" style="font-size:18px;margin:4px 0 12px">検索結果 <span class="sans" style="font-size:14px;color:var(--muted)" id="count"></span></h2>
       <div id="cards"></div>
     </div>
   </div>
 
-<script src="assets/config.js?v=20260704f"></script>
-<script src="assets/data.js?v=20260704f"></script>
-<script src="assets/maps.js?v=20260704f"></script>
-<script src="assets/app.js?v=20260704f"></script>
+<script src="assets/config.js?v=20260704g"></script>
+<script src="assets/data.js?v=20260704g"></script>
+<script src="assets/maps.js?v=20260704g"></script>
+<script src="assets/app.js?v=20260704g"></script>
 <script>
   let activeCat = "all", q = "", area = "all", places = [];
 
@@ -66,6 +67,7 @@
       inArea(p, area) &&
       (!q || (p.name + " " + (p.address||"")).toLowerCase().includes(q))
     );
+    $("#count").textContent = `（${list.length}件）`;
     const cards = $("#cards"); cards.innerHTML = "";
     if (!list.length) { cards.innerHTML = `<div class="empty"><div class="big">🔍</div>該当するスポットがありません。</div>`; return; }
     list.forEach(p => {

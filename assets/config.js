@@ -12,7 +12,10 @@
    =========================================================== */
 window.WC_CONFIG = {
   // 例: "AIzaSyD-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  GOOGLE_MAPS_API_KEY: "AIzaSyBYSrIit3f_fdb5-hf4ba8NGreEbY97RrI",
+  // ⚠️ 課金停止のため一時的に無効化しています（空 = 地図はLeaflet/無料、Places検索・写真・口コミ取得は停止）。
+  //    再有効化するときは下記コメントのキーを GOOGLE_MAPS_API_KEY に戻してください。
+  // 元のキー: "AIzaSyBYSrIit3f_fdb5-hf4ba8NGreEbY97RrI"
+  GOOGLE_MAPS_API_KEY: "",
 
   // 地図の初期表示位置（東京・中心部）
   DEFAULT_CENTER: { lat: 35.6720, lng: 139.7100 },
