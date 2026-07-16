@@ -31,9 +31,14 @@ const CATEGORIES = [
   { key: "school", label: "スクール",    icon: "🎓" },  // ドッグトレーニング・しつけ
   { key: "salon",  label: "サロン",     icon: "✂️" },  // トリミング
   { key: "clinic", label: "動物病院",   icon: "🏥" },
+  { key: "daycare",  label: "一時預かり", icon: "🏠" },
+  { key: "sitter",   label: "シッター",   icon: "🤝" },
+  { key: "care",     label: "介護",      icon: "🦽" },
+  { key: "memorial", label: "供養",      icon: "🕊" },
   { key: "other",  label: "その他",     icon: "✦" },
 ];
 const catLabel = k => (CATEGORIES.find(c => c.key === k) || {}).label || "その他";
+const sourceLabel = s => s === "user" ? "ユーザー登録" : (s === "osm" ? "OpenStreetMap" : "Google Map掲載");
 
 /* 住所から所在地概要を抽出（例: "〒150-0001 東京都渋谷区神宮前３丁目…" → "東京都渋谷区神宮前３丁目"） */
 function areaSummary(addr) {
@@ -106,7 +111,8 @@ function placeCardHTML(p, opts) {
       <div class="meta">
         ${p.avg ? `<span class="stars">${stars(p.avg)}</span> <span>${p.avg.toFixed(1)}</span>` : `<span>口コミなし</span>`}
         <span>📍 ${p.checkinCount || 0} チェックイン</span>
-        <span>${p.source === "user" ? "ユーザー登録" : "Google Map掲載"}</span>
+        ${p.indoorOk === true ? `<span style="color:var(--ok);font-weight:600">🐕 店内OK</span>` : ""}
+        <span>${sourceLabel(p.source)}</span>
       </div>
     </div>`;
 }

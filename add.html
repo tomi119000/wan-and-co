@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポットを登録 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260704g">
+<link rel="stylesheet" href="assets/style.css?v=20260706a">
 </head>
 <body>
   <div class="app">
@@ -34,6 +34,10 @@
             <option value="school">🎓 スクール（トレーニング・しつけ）</option>
             <option value="salon">✂️ サロン（トリミング）</option>
             <option value="clinic">🏥 動物病院</option>
+            <option value="daycare">🏠 一時預かり・ペットホテル</option>
+            <option value="sitter">🤝 ペットシッター</option>
+            <option value="care">🦽 介護・老犬ホーム</option>
+            <option value="memorial">🕊 供養・メモリアル</option>
             <option value="other">✦ その他</option>
           </select>
         </div>
@@ -41,6 +45,20 @@
         <div class="field">
           <label for="address">住所 / エリア</label>
           <input type="text" id="address" placeholder="東京都港区南青山…">
+        </div>
+
+        <div class="field">
+          <label for="tel">電話番号（任意）</label>
+          <input type="tel" id="tel" placeholder="03-1234-5678">
+        </div>
+
+        <div class="field">
+          <label for="indoor">店内へのワンちゃん同伴</label>
+          <select id="indoor">
+            <option value="">不明・未確認</option>
+            <option value="yes">🐕 店内同伴OK</option>
+            <option value="no">テラス席のみ / 店内不可</option>
+          </select>
         </div>
 
         <div class="field">
@@ -78,10 +96,10 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20260704g"></script>
-<script src="assets/data.js?v=20260704g"></script>
-<script src="assets/maps.js?v=20260704g"></script>
-<script src="assets/app.js?v=20260704g"></script>
+<script src="assets/config.js?v=20260706a"></script>
+<script src="assets/data.js?v=20260706a"></script>
+<script src="assets/maps.js?v=20260706a"></script>
+<script src="assets/app.js?v=20260706a"></script>
 <script>
   let picked = null, files = [], map = null;
   (async () => { const u = await Data.ready(); if (!u) location.href = "index.html"; })();
@@ -135,6 +153,8 @@
       name: $("#name").value.trim(),
       category: $("#category").value,
       address: $("#address").value.trim(),
+      tel: $("#tel").value.trim(),
+      indoorOk: $("#indoor").value === "yes" ? true : ($("#indoor").value === "no" ? false : null),
       desc: $("#desc").value.trim(),
       lat: picked ? picked[0] : null,
       lng: picked ? picked[1] : null,

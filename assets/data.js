@@ -115,6 +115,7 @@
       id: p.id, name: p.name, category: p.category, address: p.address, desc: p.desc,
       lat: p.lat, lng: p.lng, visibility: p.visibility, source: p.source,
       ownerId: p.ownerId, ownerName: p.ownerName, cover: (p.photos && p.photos[0]) || "", placeId: p.placeId || "",
+      tel: p.tel || "", website: p.website || "", indoorOk: p.indoorOk ?? null, area: p.area || "",
       checkinCount: (p.checkins || []).length, reviewCount: (p.reviews || []).length, avg: avgLocal(p),
     });
     const avgLocal = p => { const r = (p.reviews || []).filter(x => x.rating); return r.length ? r.reduce((a, b) => a + b.rating, 0) / r.length : null; };
@@ -134,6 +135,7 @@
         const list = all();
         const rec = { id: uid(), source: "user", ownerId: cur.id, ownerName: cur.name, createdAt: Date.now(),
           visibility: f.visibility || "public", name: f.name, category: f.category, address: f.address,
+          tel: f.tel || "", indoorOk: f.indoorOk ?? null,
           desc: f.desc, lat: f.lat, lng: f.lng, photos, checkins: [], reviews: [] };
         list.unshift(rec); saveAll(list); return rec.id;
       },
@@ -236,6 +238,7 @@
       id, name: d.name, category: d.category, address: d.address, desc: d.desc,
       lat: d.lat ?? null, lng: d.lng ?? null, visibility: d.visibility, source: d.source,
       ownerId: d.ownerId, ownerName: d.ownerName, cover: d.cover || "", placeId: d.placeId || "",
+      tel: d.tel || "", website: d.website || "", indoorOk: d.indoorOk ?? null, area: d.area || "",
       checkinCount: d.checkinCount || 0, reviewCount: d.reviewCount || 0,
       avg: d.reviewCount ? (d.ratingSum || 0) / d.reviewCount : null,
     });
@@ -282,6 +285,7 @@
         const ref = await db.collection("places").add({
           source: "user", ownerId: cur.id, ownerName: cur.name, name: f.name, category: f.category,
           address: f.address || "", desc: f.desc || "", lat: f.lat ?? null, lng: f.lng ?? null,
+          tel: f.tel || "", indoorOk: f.indoorOk ?? null,
           visibility: f.visibility || "public", cover: covers[0] || "",
           checkinCount: 0, reviewCount: 0, ratingSum: 0, createdAt: FS.FieldValue.serverTimestamp(),
         });
