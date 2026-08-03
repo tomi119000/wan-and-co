@@ -63,6 +63,13 @@
   const SEED = seedData();
   const avgOf = p => (p.reviewCount ? (p.ratingSum || 0) / p.reviewCount : null);
 
+  /* 店内同伴可否の実効値。ユーザー報告（多数決）を優先し、無ければ元データ(OSM等)を使う */
+  function effIndoor(d) {
+    const y = d.indoorYes || 0, n = d.indoorNo || 0;
+    if (y || n) return y > n ? true : (n > y ? false : null);
+    return d.indoorOk ?? null;
+  }
+
   /* Google Places の types（＋施設名）→ アプリのカテゴリー */
   function catFromTypes(types, primary, name) {
     const t = (primary ? [primary] : []).concat(types || []).map(x => String(x).toLowerCase());
@@ -140,7 +147,10 @@
       id: p.id, name: p.name, category: p.category, address: p.address, desc: p.desc,
       lat: p.lat, lng: p.lng, visibility: p.visibility, source: p.source,
       ownerId: p.ownerId, ownerName: p.ownerName, cover: (p.photos && p.photos[0]) || "", placeId: p.placeId || "",
-      tel: p.tel || "", website: p.website || "", indoorOk: p.indoorOk ?? null, area: p.area || "",
+      tel: p.tel || "", website: p.website || "", area: p.area || "",
+      indoorOk: effIndoor({ indoorOk: p.indoorOk, indoorYes: (p.dogReports || []).filter(r => r.ok).length, indoorNo: (p.dogReports || []).filter(r => !r.ok).length }),
+      indoorYes: (p.dogReports || []).filter(r => r.ok).length,
+      indoorNo: (p.dogReports || []).filter(r => !r.ok).length,
       checkinCount: (p.checkins || []).length, reviewCount: (p.reviews || []).length, avg: avgLocal(p),
     });
     const avgLocal = p => { const r = (p.reviews || []).filter(x => x.rating); return r.length ? r.reduce((a, b) => a + b.rating, 0) / r.length : null; };
@@ -176,10 +186,22 @@
         const p = all().find(x => x.id === id);
         if (!p) {
           const stat = (await loadStaticPlaces()).get(id);
-          return stat ? { place: stat, reviews: [], photos: [], checkedInToday: false } : null;
+          return stat ? { place: stat, reviews: [], photos: [], checkedInToday: false, myIndoorReport: null } : null;
         }
         const checkedInToday = (p.checkins || []).some(c => cur && c.userId === cur.id && new Date(c.at).toISOString().slice(0, 10) === today());
-        return { place: summary(p), reviews: (p.reviews || []).slice(), photos: (p.photos || []).slice(), checkedInToday };
+        const mine = (p.dogReports || []).find(r => cur && r.userId === cur.id);
+        return { place: summary(p), reviews: (p.reviews || []).slice(), photos: (p.photos || []).slice(),
+          checkedInToday, myIndoorReport: mine ? mine.ok : null };
+      },
+
+      /* 店内同伴の報告（1人1票・変更可） */
+      async reportIndoor(id, ok) {
+        if (!cur) return;
+        await ensureLocal(id);
+        const list = all(); const p = list.find(x => x.id === id); if (!p) return;
+        p.dogReports = (p.dogReports || []).filter(r => r.userId !== cur.id);
+        p.dogReports.push({ userId: cur.id, ok, at: Date.now() });
+        saveAll(list);
       },
       async add(f, files) {
         const photos = [];
@@ -295,7 +317,8 @@
       id, name: d.name, category: d.category, address: d.address, desc: d.desc,
       lat: d.lat ?? null, lng: d.lng ?? null, visibility: d.visibility, source: d.source,
       ownerId: d.ownerId, ownerName: d.ownerName, cover: d.cover || "", placeId: d.placeId || "",
-      tel: d.tel || "", website: d.website || "", indoorOk: d.indoorOk ?? null, area: d.area || "",
+      tel: d.tel || "", website: d.website || "", indoorOk: effIndoor(d), area: d.area || "",
+      indoorYes: d.indoorYes || 0, indoorNo: d.indoorNo || 0,
       checkinCount: d.checkinCount || 0, reviewCount: d.reviewCount || 0,
       avg: d.reviewCount ? (d.ratingSum || 0) / d.reviewCount : null,
     });
@@ -353,19 +376,42 @@
         if (!doc || !doc.exists) {
           // Firestore 未昇格の静的(OSM)スポット → 読み取り消費ゼロで表示
           const stat = (await loadStaticPlaces()).get(id);
-          return stat ? { place: stat, reviews: [], photos: [], checkedInToday: false } : null;
+          return stat ? { place: stat, reviews: [], photos: [], checkedInToday: false, myIndoorReport: null } : null;
         }
-        const [rev, pho, chk] = await Promise.all([
+        const [rev, pho, chk, rep] = await Promise.all([
           ref.collection("reviews").orderBy("at", "desc").get(),
           ref.collection("photos").orderBy("at", "asc").get(),
           cur ? ref.collection("checkins").doc(`${cur.id}_${today()}`).get() : Promise.resolve({ exists: false }),
+          cur ? ref.collection("dogReports").doc(cur.id).get().catch(() => ({ exists: false })) : Promise.resolve({ exists: false }),
         ]);
         return {
           place: summary(doc.id, doc.data()),
           reviews: rev.docs.map(d => ({ id: d.id, ...d.data(), at: tsToMs(d.data().at) })),
           photos: pho.docs.map(d => d.data().url),
           checkedInToday: chk.exists,
+          myIndoorReport: rep.exists ? rep.data().ok : null,
         };
+      },
+
+      /* 店内同伴の報告（1人1票・変更可） */
+      async reportIndoor(id, ok) {
+        await bootstrap; if (!cur) return;
+        await ensurePlaceDoc(id); // 静的スポットなら Firestore へ昇格
+        const ref = db.collection("places").doc(id);
+        const rep = ref.collection("dogReports").doc(cur.id);
+        await db.runTransaction(async tx => {
+          const prev = await tx.get(rep);
+          const prevOk = prev.exists ? prev.data().ok : null;
+          if (prevOk === ok) return; // 変更なし
+          let dy = 0, dn = 0;
+          if (prevOk === true) dy--; else if (prevOk === false) dn--;
+          if (ok === true) dy++; else dn++;
+          tx.set(rep, { userId: cur.id, ok, at: FS.FieldValue.serverTimestamp() });
+          const upd = {};
+          if (dy) upd.indoorYes = FS.FieldValue.increment(dy);
+          if (dn) upd.indoorNo = FS.FieldValue.increment(dn);
+          if (Object.keys(upd).length) tx.update(ref, upd);
+        });
       },
       async add(f, files) {
         await bootstrap;

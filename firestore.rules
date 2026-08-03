@@ -17,11 +17,11 @@ service cloud.firestore {
       allow create: if signedIn()
                     && request.resource.data.ownerId == request.auth.uid;
 
-      // 更新は「所有者による編集」または「集計フィールドだけの更新（他人のチェックイン/口コミ反映）」を許可
+      // 更新は「所有者による編集」または「集計フィールドだけの更新（他人のチェックイン/口コミ/同伴報告の反映）」を許可
       allow update: if signedIn() && (
         resource.data.ownerId == request.auth.uid
         || request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['checkinCount','reviewCount','ratingSum'])
+             .hasOnly(['checkinCount','reviewCount','ratingSum','indoorYes','indoorNo'])
       );
 
       // 削除は所有者のみ
@@ -45,6 +45,12 @@ service cloud.firestore {
       match /checkins/{c} {
         allow read: if true;
         allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      }
+
+      // 店内同伴の報告（1人1票・ID = userId。本人のみ登録／変更／取消）
+      match /dogReports/{uid} {
+        allow read: if true;
+        allow create, update, delete: if signedIn() && request.auth.uid == uid;
       }
     }
 
