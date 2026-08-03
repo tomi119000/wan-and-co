@@ -262,6 +262,18 @@ textarea { min-height: 110px; resize: vertical; }
   transition: opacity .3s, transform .3s; pointer-events:none; box-shadow: var(--shadow);
 }
 .toast.show { opacity:1; transform: translateX(-50%) translateY(-6px); }
+/* 絞り込みトグル（店内同伴OKのみ 等） */
+.toggle-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: system-ui, sans-serif; font-size: 13.5px; font-weight: 600;
+  padding: 10px 16px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-2);
+  cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.toggle-chip:active { transform: translateY(1px); }
+.toggle-chip.active { background: var(--ok); border-color: var(--ok); color: #fff; }
+.filter-row { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
+
 /* scroll affordance hint (map home) */
 .scroll-hint {
   position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);

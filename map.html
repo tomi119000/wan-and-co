@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260706b">
+<link rel="stylesheet" href="assets/style.css?v=20260706c">
 </head>
 <body>
   <div class="app">
@@ -20,7 +20,10 @@
     </header>
 
     <div class="pad" style="padding-bottom:10px">
-      <div class="chips" id="cats"></div>
+      <div class="chips" id="cats" style="margin-bottom:10px"></div>
+      <div class="filter-row">
+        <button class="toggle-chip" id="indoorOnly">🐕 店内同伴OKのみ</button>
+      </div>
     </div>
 
     <div class="map-wrap">
@@ -40,12 +43,19 @@
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20260706b"></script>
-<script src="assets/data.js?v=20260706b"></script>
-<script src="assets/maps.js?v=20260706b"></script>
-<script src="assets/app.js?v=20260706b"></script>
+<script src="assets/config.js?v=20260706c"></script>
+<script src="assets/data.js?v=20260706c"></script>
+<script src="assets/maps.js?v=20260706c"></script>
+<script src="assets/app.js?v=20260706c"></script>
 <script>
-  let activeCat = "all", map = null, places = [];
+  let activeCat = "all", indoorOnly = false, map = null, places = [];
+
+  // 「店内同伴OKのみ」トグル
+  $("#indoorOnly").addEventListener("click", e => {
+    indoorOnly = !indoorOnly;
+    e.currentTarget.classList.toggle("active", indoorOnly);
+    render();
+  });
 
   $("#logout").addEventListener("click", async () => { await Auth.logout(); location.href = "index.html"; });
 
@@ -96,6 +106,7 @@
   const gCat = g => (window.catFromGoogleTypes ? window.catFromGoogleTypes(g.types, g.primaryType, g.name) : "other");
   // カテゴリ絞り込みを反映した検索結果（元の index を保持）
   function filteredDiscovery() {
+    if (indoorOnly) return []; // 検索結果は店内同伴の情報を持たないため除外
     return findResults.map((g, i) => ({ g, i })).filter(({ g }) => activeCat === "all" || gCat(g) === activeCat);
   }
   // 検索結果を「カード表示用の疑似スポット」に変換
@@ -166,7 +177,11 @@
     btn.disabled = false; btn.textContent = "🔍 このエリアの犬同伴スポットを探す";
   });
 
-  function filtered() { return places.filter(p => activeCat === "all" || p.category === activeCat); }
+  function filtered() {
+    return places.filter(p =>
+      (activeCat === "all" || p.category === activeCat) &&
+      (!indoorOnly || p.indoorOk === true));
+  }
 
   // 地図に表示されている範囲内か（＝ピンが見えているか）
   function inView(lat, lng) {
@@ -199,7 +214,9 @@
     $("#count").textContent = `（${reg.length + disc.length}件）`;
     const cards = $("#cards");
     if (!reg.length && !disc.length) {
-      cards.innerHTML = `<div class="empty"><div class="big">🐾</div>この範囲にスポットがありません。<br>地図を動かすか、上の検索をお試しください。</div>`;
+      cards.innerHTML = indoorOnly
+        ? `<div class="empty"><div class="big">🐕</div>この範囲で「店内同伴OK」が確認できたスポットはありません。<br>地図を動かすか、絞り込みを解除してください。</div>`
+        : `<div class="empty"><div class="big">🐾</div>この範囲にスポットがありません。<br>地図を動かすか、上の検索をお試しください。</div>`;
       return;
     }
     const makers = [
