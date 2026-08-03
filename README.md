@@ -108,6 +108,19 @@ meta/seeded_v1   // 初期シード投入済みマーカー
 
 ---
 
+## 3.5 ハイブリッドデータ構成（OSM静的データ＋Firestore）
+
+Firestore の無料枠（読み取り5万/日）を節約するため、施設データは二層構成:
+
+- **静的データ**: 首都圏の犬関連スポット約1,300件（OpenStreetMap由来）を
+  [`assets/osm-data.json`](assets/osm-data.json) として GitHub Pages から配信（読み取り無制限・無料）。
+  生成は [`tools/import-osm.mjs`](tools/import-osm.mjs)（Overpass API + 国土地理院逆ジオコーダ、Google API不使用）。
+- **Firestore**: ユーザー登録スポット＋「口コミ/チェックインされた静的スポット」のみ保存。
+  静的スポットに最初の口コミ/チェックインが付いた時点で自動的に Firestore へ昇格（`ensurePlaceDoc`）。
+- 表示時はデータ層（`data.js`）が両者を ID でマージ（Firestore 側が優先＝集計値つき）。
+- データ更新: `node tools/import-osm.mjs fetch` → 生成JSONを `assets/osm-data.json` に変換して push。
+- 出典表示: © OpenStreetMap contributors (ODbL)。
+
 ## 4. アーキテクチャ
 
 - **`assets/data.js`** — データ層。`Auth` と `Store` を **Firebase / localStorage の二層**で同一の
