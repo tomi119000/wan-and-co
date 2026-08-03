@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット一覧 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260706a">
+<link rel="stylesheet" href="assets/style.css?v=20260706b">
 </head>
 <body>
   <div class="app">
@@ -30,10 +30,10 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20260706a"></script>
-<script src="assets/data.js?v=20260706a"></script>
-<script src="assets/maps.js?v=20260706a"></script>
-<script src="assets/app.js?v=20260706a"></script>
+<script src="assets/config.js?v=20260706b"></script>
+<script src="assets/data.js?v=20260706b"></script>
+<script src="assets/maps.js?v=20260706b"></script>
+<script src="assets/app.js?v=20260706b"></script>
 <script>
   let activeCat = "all", q = "", area = "all", places = [];
 
@@ -68,16 +68,14 @@
       (!q || (p.name + " " + (p.address||"")).toLowerCase().includes(q))
     );
     $("#count").textContent = `（${list.length}件）`;
-    const cards = $("#cards"); cards.innerHTML = "";
+    const cards = $("#cards");
     if (!list.length) { cards.innerHTML = `<div class="empty"><div class="big">🔍</div>該当するスポットがありません。</div>`; return; }
-    list.forEach(p => {
+    renderCardsChunked(cards, list.map(p => () => {
       const a = document.createElement("a");
       a.href = `place.html?id=${p.id}`; a.className = "card place-card"; a.style.marginBottom="16px"; a.style.display="block";
       a.innerHTML = placeCardHTML(p);
-      cards.appendChild(a);
-    });
-    hydrateCardPhotos(cards); // 写真の無い施設は Places API から後埋め
-    wireSaveButtons(cards);   // 保存ボタンを配線
+      return a;
+    }));
   }
   mountNav("list");
 </script>

@@ -82,6 +82,31 @@
   window.catFromGoogleTypes = catFromTypes; // 検索結果のカテゴリー判定に利用
 
   /* =======================================================================
+     静的スポットデータ（OSM）
+     GitHub Pages から配信される assets/osm-data.json を読み込む。
+     Firestore の読み取り枠を消費しない「ベースの施設一覧」。
+     ユーザーが口コミ・チェックインした施設だけ Firestore に昇格される。
+     ======================================================================= */
+  const OSM_DATA_URL = "assets/osm-data.json?v=20260706b";
+  let staticCache = null;
+  async function loadStaticPlaces() {
+    if (staticCache) return staticCache;
+    const map = new Map();
+    try {
+      const r = await fetch(OSM_DATA_URL);
+      (await r.json()).forEach(p => map.set(p.id, {
+        id: p.id, source: "osm", name: p.name, category: p.category || "other",
+        address: p.address || "", desc: "", lat: p.lat ?? null, lng: p.lng ?? null,
+        tel: p.tel || "", website: p.website || "", indoorOk: p.indoorOk ?? null, area: p.area || "",
+        visibility: "public", ownerId: null, ownerName: "OpenStreetMap", cover: "", placeId: "",
+        checkinCount: 0, reviewCount: 0, avg: null,
+      }));
+    } catch (e) { /* 読み込み失敗時は静的データなしで続行 */ }
+    staticCache = map;
+    return map;
+  }
+
+  /* =======================================================================
      LOCAL BACKEND (localStorage) — 端末内。データ共有なし。
      ======================================================================= */
   function localBackend() {
@@ -120,12 +145,39 @@
     });
     const avgLocal = p => { const r = (p.reviews || []).filter(x => x.rating); return r.length ? r.reduce((a, b) => a + b.rating, 0) / r.length : null; };
 
+    /* 静的(OSM)スポットを、口コミ/チェックイン時にローカルDBへ取り込む */
+    async function ensureLocal(id) {
+      const list = all();
+      if (list.some(p => p.id === id)) return;
+      const stat = (await loadStaticPlaces()).get(id);
+      if (!stat) return;
+      list.unshift({ id, source: "osm", ownerId: cur ? cur.id : null, ownerName: "OpenStreetMap",
+        name: stat.name, category: stat.category, address: stat.address, desc: "",
+        tel: stat.tel, website: stat.website, indoorOk: stat.indoorOk, area: stat.area,
+        lat: stat.lat, lng: stat.lng, visibility: "public", photos: [], checkins: [], reviews: [], createdAt: Date.now() });
+      saveAll(list);
+    }
+
     const Store = {
-      async visible() { return all().filter(p => p.visibility === "public" || (cur && p.ownerId === cur.id)).map(summary); },
-      async mine() { return all().filter(p => cur && p.ownerId === cur.id).map(summary); },
-      async get(id) { const p = all().find(x => x.id === id); return p ? summary(p) : null; },
+      async visible() {
+        const stat = await loadStaticPlaces();
+        const out = new Map(stat);
+        all().filter(p => p.visibility === "public" || (cur && p.ownerId === cur.id))
+          .forEach(p => out.set(p.id, summary(p)));
+        return [...out.values()];
+      },
+      async mine() { return all().filter(p => cur && p.ownerId === cur.id && p.source === "user").map(summary); },
+      async get(id) {
+        const p = all().find(x => x.id === id);
+        if (p) return summary(p);
+        return (await loadStaticPlaces()).get(id) || null;
+      },
       async detail(id) {
-        const p = all().find(x => x.id === id); if (!p) return null;
+        const p = all().find(x => x.id === id);
+        if (!p) {
+          const stat = (await loadStaticPlaces()).get(id);
+          return stat ? { place: stat, reviews: [], photos: [], checkedInToday: false } : null;
+        }
         const checkedInToday = (p.checkins || []).some(c => cur && c.userId === cur.id && new Date(c.at).toISOString().slice(0, 10) === today());
         return { place: summary(p), reviews: (p.reviews || []).slice(), photos: (p.photos || []).slice(), checkedInToday };
       },
@@ -148,11 +200,13 @@
         saveAll(list); return id;
       },
       async addReview(id, { rating, text }) {
+        await ensureLocal(id);
         const list = all(); const p = list.find(x => x.id === id); if (!p) return;
         (p.reviews = p.reviews || []).unshift({ id: uid(), userId: cur.id, userName: cur.name, rating, text, at: Date.now() });
         saveAll(list);
       },
       async checkIn(id) {
+        await ensureLocal(id);
         const list = all(); const p = list.find(x => x.id === id); if (!p) return { added: false, count: 0 };
         p.checkins = p.checkins || [];
         if (p.checkins.some(c => c.userId === cur.id && new Date(c.at).toISOString().slice(0, 10) === today()))
@@ -167,7 +221,10 @@
       async savedIds() { return read(K.SAVES, {})[cur ? cur.id : "_"] || []; },
       async saveFavorite(id) { const m = read(K.SAVES, {}); const k = cur ? cur.id : "_"; const a = m[k] || []; if (a.indexOf(id) === -1) a.push(id); m[k] = a; write(K.SAVES, m); },
       async unsaveFavorite(id) { const m = read(K.SAVES, {}); const k = cur ? cur.id : "_"; m[k] = (m[k] || []).filter(x => x !== id); write(K.SAVES, m); },
-      async saved() { const ids = await this.savedIds(); return all().filter(p => ids.indexOf(p.id) !== -1).map(summary); },
+      async saved() {
+        const [ids, stat] = [await this.savedIds(), await loadStaticPlaces()];
+        return ids.map(id => { const p = all().find(x => x.id === id); return p ? summary(p) : stat.get(id); }).filter(Boolean);
+      },
 
       async myStats() {
         const list = all();
@@ -243,11 +300,32 @@
       avg: d.reviewCount ? (d.ratingSum || 0) / d.reviewCount : null,
     });
 
+    /* 静的(OSM)スポットを、初回の口コミ/チェックイン時に Firestore へ「昇格」させる */
+    async function ensurePlaceDoc(id) {
+      const stat = (await loadStaticPlaces()).get(id);
+      if (!stat) return; // 静的データ由来でなければ既存doc前提
+      try { await db.collection("places").doc(id).get(); return; } // 取得できれば作成済み
+      catch (e) { /* 未作成（permission-denied）→ 作成へ */ }
+      await db.collection("places").doc(id).set({
+        source: "osm", ownerId: cur.id, ownerName: "OpenStreetMap",
+        name: stat.name, category: stat.category, address: stat.address, desc: "",
+        tel: stat.tel, website: stat.website, indoorOk: stat.indoorOk, area: stat.area,
+        lat: stat.lat, lng: stat.lng, visibility: "public", cover: "",
+        checkinCount: 0, reviewCount: 0, ratingSum: 0,
+        attribution: "© OpenStreetMap contributors",
+        createdAt: FS.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+
     const Store = {
       async visible() {
         await bootstrap;
-        const out = new Map();
-        const pub = await db.collection("places").where("visibility", "==", "public").get();
+        // 静的(OSM)データが土台。Firestore側（ユーザー登録・昇格済み・Google取込）が同IDを上書き。
+        const [stat, pub] = await Promise.all([
+          loadStaticPlaces(),
+          db.collection("places").where("visibility", "==", "public").get(),
+        ]);
+        const out = new Map(stat);
         pub.forEach(doc => out.set(doc.id, summary(doc.id, doc.data())));
         if (cur) {
           const own = await db.collection("places").where("ownerId", "==", cur.id).get();
@@ -261,11 +339,22 @@
         // 自分で登録したスポットのみ（初回シードの「Google Map掲載」施設は除外）
         return snap.docs.filter(d => d.data().source === "user").map(d => summary(d.id, d.data()));
       },
-      async get(id) { await bootstrap; const doc = await db.collection("places").doc(id).get(); return doc.exists ? summary(doc.id, doc.data()) : null; },
+      async get(id) {
+        await bootstrap;
+        try { const doc = await db.collection("places").doc(id).get(); if (doc.exists) return summary(doc.id, doc.data()); }
+        catch (e) { /* 未作成の静的スポット */ }
+        return (await loadStaticPlaces()).get(id) || null;
+      },
       async detail(id) {
         await bootstrap;
         const ref = db.collection("places").doc(id);
-        const doc = await ref.get(); if (!doc.exists) return null;
+        let doc = null;
+        try { doc = await ref.get(); } catch (e) { doc = null; }
+        if (!doc || !doc.exists) {
+          // Firestore 未昇格の静的(OSM)スポット → 読み取り消費ゼロで表示
+          const stat = (await loadStaticPlaces()).get(id);
+          return stat ? { place: stat, reviews: [], photos: [], checkedInToday: false } : null;
+        }
         const [rev, pho, chk] = await Promise.all([
           ref.collection("reviews").orderBy("at", "desc").get(),
           ref.collection("photos").orderBy("at", "asc").get(),
@@ -313,6 +402,7 @@
       },
       async addReview(id, { rating, text }) {
         await bootstrap;
+        await ensurePlaceDoc(id); // 静的スポットなら Firestore へ昇格
         const ref = db.collection("places").doc(id);
         await ref.collection("reviews").add({ userId: cur.id, userName: cur.name, rating, text, at: FS.FieldValue.serverTimestamp() });
         await ref.update({ reviewCount: FS.FieldValue.increment(1), ratingSum: FS.FieldValue.increment(rating) });
@@ -320,6 +410,7 @@
       },
       async checkIn(id) {
         await bootstrap;
+        await ensurePlaceDoc(id); // 静的スポットなら Firestore へ昇格
         const ref = db.collection("places").doc(id);
         const ck = ref.collection("checkins").doc(`${cur.id}_${today()}`);
         const res = await db.runTransaction(async tx => {
@@ -352,8 +443,13 @@
       },
       async saved() {
         await bootstrap; if (!cur) return [];
-        const ids = await this.savedIds(); const out = [];
-        for (const id of ids) { try { const doc = await db.collection("places").doc(id).get(); if (doc.exists) out.push(summary(doc.id, doc.data())); } catch (e) {} }
+        const [ids, stat] = await Promise.all([this.savedIds(), loadStaticPlaces()]);
+        const out = [];
+        for (const id of ids) {
+          try { const doc = await db.collection("places").doc(id).get(); if (doc.exists) { out.push(summary(doc.id, doc.data())); continue; } }
+          catch (e) { /* 未昇格の静的スポット */ }
+          const s = stat.get(id); if (s) out.push(s);
+        }
         return out;
       },
 

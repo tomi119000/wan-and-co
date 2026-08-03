@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260706a">
+<link rel="stylesheet" href="assets/style.css?v=20260706b">
 </head>
 <body>
   <div class="app">
@@ -40,10 +40,10 @@
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20260706a"></script>
-<script src="assets/data.js?v=20260706a"></script>
-<script src="assets/maps.js?v=20260706a"></script>
-<script src="assets/app.js?v=20260706a"></script>
+<script src="assets/config.js?v=20260706b"></script>
+<script src="assets/data.js?v=20260706b"></script>
+<script src="assets/maps.js?v=20260706b"></script>
+<script src="assets/app.js?v=20260706b"></script>
 <script>
   let activeCat = "all", map = null, places = [];
 
@@ -68,7 +68,7 @@
     WCMap.ready().then(() => {
       map = WCMap.create("map", { interactive: true });
       render();
-      if (map.onIdle) map.onIdle(() => renderCards()); // 地図を動かすとリストも追従
+      if (map.onIdle) map.onIdle(() => render()); // 地図を動かすとマーカー・リストが追従
       if (WCMap.canSearch) $("#findBtn").style.display = "flex"; // Google Maps モードのみ
     });
     render();
@@ -176,11 +176,11 @@
   }
 
   function render() {
-    // マーカー（カテゴリで絞り込み。範囲外のピンは画面外なので自然に非表示）
+    // マーカー（カテゴリ＋表示範囲で絞り込み。大量データでも軽く保つ）
     if (map) {
       map.clearMarkers();
       filtered().forEach(p => {
-        if (p.lat == null) return;
+        if (p.lat == null || !inView(p.lat, p.lng)) return;
         map.addMarker({ lat: p.lat, lng: p.lng }, {
           title: p.name,
           html: `<b>${escapeHtml(p.name)}</b><br>${catLabel(p.category)}<br>
@@ -197,30 +197,31 @@
     const reg = filtered().filter(p => inView(p.lat, p.lng));
     const disc = filteredDiscovery().filter(({ g }) => inView(g.lat, g.lng));
     $("#count").textContent = `（${reg.length + disc.length}件）`;
-    const cards = $("#cards"); cards.innerHTML = "";
+    const cards = $("#cards");
     if (!reg.length && !disc.length) {
       cards.innerHTML = `<div class="empty"><div class="big">🐾</div>この範囲にスポットがありません。<br>地図を動かすか、上の検索をお試しください。</div>`;
       return;
     }
-    // 登録済みスポット（詳細ページへ）
-    reg.forEach(p => {
-      const a = document.createElement("a");
-      a.href = `place.html?id=${p.id}`; a.className = "card place-card";
-      a.style.marginBottom = "16px"; a.style.display = "block";
-      a.innerHTML = placeCardHTML(p);
-      cards.appendChild(a);
-    });
-    // 検索でピンが立った未登録スポット（タップで取り込み→詳細へ）
-    disc.forEach(({ g, i }) => {
-      const a = document.createElement("a");
-      a.href = "#"; a.className = "card place-card";
-      a.style.marginBottom = "16px"; a.style.display = "block";
-      a.innerHTML = placeCardHTML(discoveryToPlace(g));
-      a.addEventListener("click", e => { e.preventDefault(); __wcImport(i); });
-      cards.appendChild(a);
-    });
-    hydrateCardPhotos(cards); // 写真の無い施設は Places API から後埋め
-    wireSaveButtons(cards);   // 保存ボタンを配線
+    const makers = [
+      // 登録済みスポット（詳細ページへ）
+      ...reg.map(p => () => {
+        const a = document.createElement("a");
+        a.href = `place.html?id=${p.id}`; a.className = "card place-card";
+        a.style.marginBottom = "16px"; a.style.display = "block";
+        a.innerHTML = placeCardHTML(p);
+        return a;
+      }),
+      // 検索でピンが立った未登録スポット（タップで取り込み→詳細へ）
+      ...disc.map(({ g, i }) => () => {
+        const a = document.createElement("a");
+        a.href = "#"; a.className = "card place-card";
+        a.style.marginBottom = "16px"; a.style.display = "block";
+        a.innerHTML = placeCardHTML(discoveryToPlace(g));
+        a.addEventListener("click", e => { e.preventDefault(); __wcImport(i); });
+        return a;
+      }),
+    ];
+    renderCardsChunked(cards, makers);
   }
 
   /* ---- geolocation ---- */

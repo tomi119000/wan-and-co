@@ -135,6 +135,30 @@ function escapeHtml(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+/* カードの分割描画（大量データでも軽い）。items は Element を返す関数の配列 */
+function renderCardsChunked(container, makers, batch) {
+  batch = batch || 60;
+  container.innerHTML = "";
+  let shown = 0;
+  const more = document.createElement("button");
+  more.className = "btn btn-ghost";
+  more.style.marginBottom = "20px";
+  function step() {
+    const frag = document.createDocumentFragment();
+    makers.slice(shown, shown + batch).forEach(make => frag.appendChild(make()));
+    shown = Math.min(shown + batch, makers.length);
+    container.appendChild(frag);
+    if (shown < makers.length) {
+      more.textContent = `さらに表示（残り ${makers.length - shown} 件）`;
+      container.appendChild(more);
+    } else { more.remove(); }
+    hydrateCardPhotos(container);
+    wireSaveButtons(container);
+  }
+  more.onclick = () => { more.remove(); step(); };
+  step();
+}
+
 function mountNav(active) {
   const nav = document.createElement("nav");
   nav.className = "bottomnav";
