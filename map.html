@@ -4,7 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20261024d">
+<link rel="preconnect" href="https://a.tile.openstreetmap.org">
+<link rel="preconnect" href="https://b.tile.openstreetmap.org">
+<link rel="preconnect" href="https://c.tile.openstreetmap.org">
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js">
+<link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js">
+<link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js">
+<link rel="preload" as="script" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+<link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/style.css?v=20261025a">
 </head>
 <body>
   <div class="app">
@@ -44,11 +53,11 @@
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20261024d"></script>
-<script src="assets/data.js?v=20261024d"></script>
-<script src="assets/maps.js?v=20261024d"></script>
-<script src="assets/gplaces.js?v=20261024d"></script>
-<script src="assets/app.js?v=20261024d"></script>
+<script src="assets/config.js?v=20261025a"></script>
+<script src="assets/data.js?v=20261025a"></script>
+<script src="assets/maps.js?v=20261025a"></script>
+<script src="assets/gplaces.js?v=20261025a"></script>
+<script src="assets/app.js?v=20261025a"></script>
 <script>
   let activeCat = "all", indoorOnly = false, map = null, places = [];
 
@@ -72,26 +81,30 @@
   });
 
   /* ---- boot: require login, then load data + map ---- */
+  // 地図はログイン確認・データ取得を待たずに先に描画する（ピンは後から載せる）
+  let dataLoaded = false;
+  WCMap.ready().then(() => {
+    map = WCMap.create("map", { interactive: true });
+    if (dataLoaded) render();
+    if (map.onIdle) map.onIdle(() => { if (dataLoaded) render(); }); // 地図を動かすとマーカー・リストが追従
+    if (WCMap.canSearch) $("#findBtn").style.display = "flex"; // Google Maps モードのみ
+  });
+
   (async () => {
+    $("#cards").innerHTML = `<div class="empty"><div class="big">🐾</div>読み込み中…</div>`;
     const user = await Data.ready();
     if (!user) { location.href = "index.html"; return; }
-    $("#cards").innerHTML = `<div class="empty"><div class="big">🐾</div>読み込み中…</div>`;
+    // Google 施設の月次インデックス（place_id＋位置のみ・30日以内のものだけ有効）。スポット取得と並行して読む
+    const ixP = (window.GPlaces && GPlaces.enabled) ? GPlaces.loadIndex().catch(() => null) : Promise.resolve(null);
     try { places = await Store.visible(); } catch (e) { places = []; toast("データの取得に失敗しました。"); }
-    // Google 施設の月次インデックス（place_id＋位置のみ・30日以内のものだけ有効）
-    if (window.GPlaces && GPlaces.enabled) {
-      GPlaces.loadIndex().then(ix => {
-        const own = new Set(places.map(p => p.id));
-        gIndex = ix.items.filter(it => !own.has("gp_" + it.pid));
-        render();
-      }).catch(() => {});
-    }
-    WCMap.ready().then(() => {
-      map = WCMap.create("map", { interactive: true });
-      render();
-      if (map.onIdle) map.onIdle(() => render()); // 地図を動かすとマーカー・リストが追従
-      if (WCMap.canSearch) $("#findBtn").style.display = "flex"; // Google Maps モードのみ
-    });
+    dataLoaded = true;
     render();
+    const ix = await ixP;
+    if (ix && ix.items.length) {
+      const own = new Set(places.map(p => p.id));
+      gIndex = ix.items.filter(it => !own.has("gp_" + it.pid));
+      render();
+    }
   })();
 
   /* スクロール可能なことを示すヒント（最初のスクロールで消す） */
@@ -201,6 +214,7 @@
   }
 
   function render() {
+    if (!dataLoaded) return;
     // マーカー（カテゴリ＋表示範囲で絞り込み。大量データでも軽く保つ）
     if (map) {
       map.clearMarkers();

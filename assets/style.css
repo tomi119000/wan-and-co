@@ -6,7 +6,8 @@
    floating bottom bar. Large tap targets (40+ friendly).
    =========================================================== */
 
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@500;600;700&display=swap");
+/* 和文Webフォントは1書体につき数十ファイルになるため、見出し用の明朝1ウェイトだけ読み込む。本文は端末の高品質なゴシック体 */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@600&display=swap");
 
 :root {
   /* palette */
@@ -34,7 +35,7 @@
   --ok:       var(--forest);
 
   --serif: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --sans:  "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Hiragino Sans", system-ui, sans-serif;
+  --sans:  "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
 
   --shadow:    0 10px 30px rgba(38, 75, 57, .08);
   --shadow-lg: 0 18px 44px rgba(38, 75, 57, .14);
@@ -280,7 +281,7 @@ input[type="file"] { display: none; }
   display: inline-flex; align-items: center; gap: 4px;
   padding: 11px 18px 11px 14px; border-radius: 999px;
   background: var(--forest); color: #fff; border: none; cursor: pointer;
-  font: 600 14px/1 "Noto Sans JP", sans-serif; letter-spacing: .04em;
+  font: 600 14px/1 var(--sans); letter-spacing: .04em;
   box-shadow: var(--shadow-lg);
 }
 .backfab:active { transform: scale(.97); }

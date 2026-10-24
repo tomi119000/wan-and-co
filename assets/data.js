@@ -301,12 +301,16 @@
       `https://www.gstatic.com/firebasejs/${V}/firebase-auth-compat.js`,
       `https://www.gstatic.com/firebasejs/${V}/firebase-firestore-compat.js`,
     ];
-    const loadSeq = arr => arr.reduce((pr, src) => pr.then(() => new Promise((res, rej) => {
-      const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s);
-    })), Promise.resolve());
+    // 並列にダウンロードし、実行順は async=false で保証する
+    const loadSeq = arr => Promise.all(arr.map(src => new Promise((res, rej) => {
+      const s = document.createElement("script"); s.src = src; s.async = false;
+      s.onload = res; s.onerror = rej; document.head.appendChild(s);
+    })));
 
     let cur = null, resolveReady;
     const readyP = new Promise(r => (resolveReady = r));
+    // index.html が認証SDKの読み込みを待たずにマップへ進むための目印（認証の本確認は各ページで行う）
+    const setAuthHint = on => { try { on ? localStorage.setItem("wc_auth_hint", "1") : localStorage.removeItem("wc_auth_hint"); } catch (e) {} };
     const authSubs = [];
     let db, auth, FS;
 
@@ -315,6 +319,7 @@
       auth = firebase.auth(); db = firebase.firestore(); FS = firebase.firestore;
       auth.onAuthStateChanged(u => {
         cur = u ? { id: u.uid, name: u.displayName || (u.email || "").split("@")[0], email: u.email } : null;
+        setAuthHint(!!cur);
         authSubs.forEach(fn => fn(cur));
         resolveReady(cur);
         if (cur) seedIfNeeded().catch(() => {});
@@ -338,7 +343,7 @@
         catch (e) { throw new Error(mapAuthError(e)); }
         return cur;
       },
-      async logout() { await bootstrap; await auth.signOut(); },
+      async logout() { setAuthHint(false); await bootstrap; await auth.signOut(); },
     };
 
     const summary = (id, d) => ({
@@ -384,16 +389,14 @@
       async visible() {
         await bootstrap;
         // 静的(OSM)データが土台。Firestore側（ユーザー登録・昇格済み・Google取込）が同IDを上書き。
-        const [stat, pub] = await Promise.all([
+        const [stat, pub, own] = await Promise.all([
           loadStaticPlaces(),
           db.collection("places").where("visibility", "==", "public").get(),
+          cur ? db.collection("places").where("ownerId", "==", cur.id).get() : null,
         ]);
         const out = new Map(stat);
         pub.forEach(doc => out.set(doc.id, summary(doc.id, doc.data())));
-        if (cur) {
-          const own = await db.collection("places").where("ownerId", "==", cur.id).get();
-          own.forEach(doc => out.set(doc.id, summary(doc.id, doc.data())));
-        }
+        if (own) own.forEach(doc => out.set(doc.id, summary(doc.id, doc.data())));
         return [...out.values()].filter(showable).sort((a, b) => (b.source === "user") - (a.source === "user"));
       },
       async mine() {
@@ -553,8 +556,10 @@
 
     /* 「Google Maps掲載」施設を一度だけ投入（固定ID・存在すればスキップ） */
     async function seedIfNeeded() {
+      try { if (localStorage.getItem("wc_seeded_v1")) return; } catch (e) {}
       const marker = db.collection("meta").doc("seeded_v1");
-      const m = await marker.get(); if (m.exists) return;
+      const m = await marker.get();
+      if (m.exists) { try { localStorage.setItem("wc_seeded_v1", "1"); } catch (e) {} return; }
       const batch = db.batch();
       // ownerId / userId は最初にログインしたユーザーに紐付ける（セキュリティルールを満たすため）。
       // ただし source:"google" として扱い、本人の「マイページ」には表示しない（mine() で除外）。
