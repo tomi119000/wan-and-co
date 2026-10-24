@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>管理 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20261025c">
+<link rel="stylesheet" href="assets/style.css?v=20261025d">
 <style>
   .row { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-top:1px solid var(--line); font-size:14px; }
   .row:first-child { border-top:none; }
@@ -29,13 +29,14 @@
     <div class="pad" id="root"><div class="empty">読み込み中…</div></div>
   </div>
 
-<script src="assets/config.js?v=20261025c"></script>
-<script src="assets/data.js?v=20261025c"></script>
-<script src="assets/gplaces.js?v=20261025c"></script>
-<script src="assets/app.js?v=20261025c"></script>
+<script src="assets/config.js?v=20261025d"></script>
+<script src="assets/data.js?v=20261025d"></script>
+<script src="assets/gplaces.js?v=20261025d"></script>
+<script src="assets/app.js?v=20261025d"></script>
 <script>
   const SKU_LABEL = {
     textPro:      ["Text Search Pro（検索）", 5000],
+    textEnt:      ["Text Search Enterprise（月次更新・サイトURL付き）", 1000],
     detailsPro:   ["Place Details Pro（店名・住所）", 5000],
     detailsAtmos: ["Place Details Ent.+Atmosphere（電話・口コミ等）", 1000],
     photo:        ["Place Photos（写真）", 1000],
@@ -52,6 +53,16 @@
     await render();
     mountNav("my");
   })();
+
+  // 公式サイトURLの一覧を画像抽出ツール（tools/site-images.mjs）への受け渡し用にダウンロード（Firestoreには保存しない）
+  function downloadSites(sites) {
+    const d = new Date(), stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+    const blob = new Blob([JSON.stringify({ generatedAt: d.toISOString(), sites }, null, 1)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `wanco-websites-${stamp}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
 
   async function render() {
     const [ix, u] = await Promise.all([GPlaces.loadIndex(), GPlaces.usage()]);
@@ -96,11 +107,19 @@
       </div>
       <p class="sans" id="estimate" style="font-size:13px;color:var(--muted)"></p>
       <button class="btn btn-gold" id="run">インデックスを更新する</button>
-      <div id="log" hidden></div>`;
+      <div id="log" hidden></div>
+
+      <h3 class="section" style="font-size:18px;margin-top:30px">施設画像の更新（更新後にMacで実行）</h3>
+      <div class="card pad sans" style="font-size:13.5px;color:var(--sage);line-height:1.8">
+        更新が終わると <b>wanco-websites-日付.json</b>（施設の公式サイトURLの一覧）がダウンロードされます。<br>
+        Macの「ターミナル」で次の1行を実行すると、各サイトの共有用画像を取得してアプリに反映します
+        （一覧ファイルは処理後に自動で削除されます）。
+        <pre style="white-space:pre-wrap;word-break:break-all;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px;margin:10px 0 0;font-size:12px">cd "${"$"}HOME/Library/Mobile Documents/com~apple~CloudDocs/ClaudeCode/wan-and-co" && node tools/site-images.mjs --publish</pre>
+      </div>`;
 
     const est = () => {
       const n = $$("#wards input:checked").length;
-      $("#estimate").textContent = `検索回数の目安：${(n * totalQueries).toLocaleString()}〜${(n * totalQueries * 3).toLocaleString()}回（Text Search Pro）`;
+      $("#estimate").textContent = `検索回数の目安：${(n * totalQueries).toLocaleString()}〜${(n * totalQueries * 3).toLocaleString()}回（Text Search Enterprise・無料枠 1,000回/月）`;
     };
     $$("#wards input").forEach(c => c.onchange = est); est();
 
@@ -114,6 +133,10 @@
       try {
         const r = await GPlaces.collect({ wards: GPlaces.WARDS.filter(w => names.includes(w.name)), onLog: write });
         write(`\n✅ 完了：${r.count}件を保存（検索 ${r.calls}回）${r.stopped ? "（途中で停止：" + r.stopped + "）" : ""}`);
+        if (r.sites && r.sites.length) {
+          downloadSites(r.sites);
+          write(`🖼 公式サイトURL ${r.sites.length}件の一覧をダウンロードしました。Macで画像の更新コマンドを実行してください。`);
+        }
         toast("インデックスを更新しました。");
       } catch (e) { write("❌ エラー：" + e.message); }
       btn.disabled = false; btn.textContent = "インデックスを更新する";

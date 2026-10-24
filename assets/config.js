@@ -27,6 +27,7 @@ window.WC_CONFIG = {
   GOOGLE_PLACES_API_KEY: "AIzaSyBYSrIit3f_fdb5-hf4ba8NGreEbY97RrI",
   PLACES_BUDGET: {
     textPro: 4000,      // Text Search Pro（無料 5,000/月）
+    textEnt: 900,       // Text Search Enterprise：月次更新で公式サイトURLも受け取る（無料 1,000/月）
     detailsPro: 4000,   // Place Details Pro：店名・住所（無料 5,000/月）
     detailsAtmos: 800,  // Place Details Enterprise+Atmosphere：電話・口コミ・犬同伴可など（無料 1,000/月）
     photo: 800,         // Place Photos（無料 1,000/月）

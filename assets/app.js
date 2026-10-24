@@ -105,7 +105,9 @@ function placeCardHTML(p, opts) {
   const needFetch = !cover && p.placeId && GOOGLE_ON;
   const hasImg = !!cover || needFetch;
   const thumbStyle = cover ? `background-image:url('${cover}')` : "";
-  const fetchAttr = needFetch ? ` data-photo="${escapeHtml(p.placeId)}"` : "";
+  const gpid = p.placeId || (String(p.id || "").startsWith("gp_") ? String(p.id).slice(3) : "");
+  const fetchAttr = needFetch ? ` data-photo="${escapeHtml(p.placeId)}"`
+    : (!hasImg && gpid ? ` data-simg="${escapeHtml(gpid)}"` : ""); // 公式サイトの共有画像があれば後から差し込む
   const catIcon = (CATEGORIES.find(c => c.key === p.category) || {}).icon || "🐾";
   const saveBtn = showSave
     ? `<button class="save-btn" data-id="${escapeHtml(p.id || "")}" data-pid="${escapeHtml(p.placeId || "")}" aria-label="保存">♡</button>`
@@ -150,6 +152,28 @@ function hydrateCardPhotos(root) {
   });
 }
 
+/* 施設の公式サイトの共有画像（tools/site-images.mjs が月次で生成）。place_id → { img, src } */
+let siteImagesP = null;
+const loadSiteImages = () => siteImagesP || (siteImagesP =
+  fetch("assets/site-images.json").then(r => r.ok ? r.json() : {}).then(j => j.images || {}).catch(() => ({})));
+function hydrateSiteImages(root) {
+  const els = $$(".thumb[data-simg]", root || document);
+  if (!els.length) return;
+  loadSiteImages().then(map => els.forEach(el => {
+    const pid = el.getAttribute("data-simg"); el.removeAttribute("data-simg");
+    const s = map[pid]; if (!s || !s.img) return;
+    const im = new Image();
+    im.onload = () => { // 読み込めた画像だけ差し替える（直リンク拒否などで失敗したらアイコンのまま）
+      if (im.naturalWidth < 120) return;
+      el.classList.remove("noimg");
+      const ph = el.querySelector(".ph"); if (ph) ph.remove();
+      el.style.backgroundImage = `url("${s.img.replace(/"/g, "%22")}")`;
+      el.insertAdjacentHTML("beforeend", `<span class="imgsrc">画像：${escapeHtml(s.src)}</span>`);
+    };
+    im.src = s.img;
+  }));
+}
+
 /* 店名を保存していない Google 施設のカードに、店名・所在地を表示時に取得して入れる（予算内のみ） */
 function hydrateGoogleNames(root) {
   if (!(window.GPlaces && GPlaces.enabled)) return;
@@ -191,6 +215,7 @@ function renderCardsChunked(container, makers, batch) {
       container.appendChild(more);
     } else { more.remove(); }
     hydrateCardPhotos(container);
+    hydrateSiteImages(container);
     hydrateGoogleNames(container);
     wireSaveButtons(container);
   }

@@ -76,6 +76,7 @@ service cloud.firestore {
       allow create: if signedIn();
       allow update: if signedIn()
         && request.resource.data.get('textPro', 0)      >= resource.data.get('textPro', 0)
+        && request.resource.data.get('textEnt', 0)      >= resource.data.get('textEnt', 0)
         && request.resource.data.get('detailsPro', 0)   >= resource.data.get('detailsPro', 0)
         && request.resource.data.get('detailsAtmos', 0) >= resource.data.get('detailsAtmos', 0)
         && request.resource.data.get('photo', 0)        >= resource.data.get('photo', 0);

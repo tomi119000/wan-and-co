@@ -22,7 +22,7 @@
 (function () {
   const cfg = window.WC_CONFIG || {};
   const KEY = (cfg.GOOGLE_PLACES_API_KEY || "").trim();
-  const BUDGET = Object.assign({ textPro: 4000, detailsPro: 4000, detailsAtmos: 800, photo: 800 }, cfg.PLACES_BUDGET || {});
+  const BUDGET = Object.assign({ textPro: 4000, textEnt: 900, detailsPro: 4000, detailsAtmos: 800, photo: 800 }, cfg.PLACES_BUDGET || {});
   const API = "https://places.googleapis.com/v1";
   const INDEX_MAX_AGE_DAYS = 30; // 位置情報のキャッシュ上限（Google 規約）
 
@@ -105,18 +105,21 @@
     pid: p.id, name: (p.displayName && p.displayName.text) || "", address: p.formattedAddress || "",
     lat: p.location ? p.location.latitude : null, lng: p.location ? p.location.longitude : null,
     types: p.types || [], primaryType: p.primaryType || "", mapsUri: p.googleMapsUri || "",
+    website: p.websiteUri || "",
   });
   // 住所の表記ゆれに強い区名判定（"日本、〒153-0063 東京都目黒区…" 等）
   const inWard = (addr, ward) => !ward || String(addr || "").includes(ward.name);
 
   /* ---------- Text Search（Pro 区分のみの項目に限定） ---------- */
   const SEARCH_MASK = "places.id,places.displayName,places.formattedAddress,places.location,places.types,places.primaryType,places.googleMapsUri,nextPageToken";
+  // 月次更新でのみ使用：websiteUri を含むため Text Search Enterprise 区分（無料 1,000回/月）
+  const SEARCH_MASK_WEB = SEARCH_MASK + ",places.websiteUri";
 
-  async function searchText(textQuery, ward, pageToken, noCache) {
+  async function searchText(textQuery, ward, pageToken, noCache, withWeb) {
     const ck = "gp:s:" + textQuery + "|" + (ward ? ward.name : "") + "|" + (pageToken || "");
     if (!noCache) { const c = ss.get(ck); if (c) return c; }
     if (!KEY) return { places: [], next: null, blocked: "nokey" };
-    if (!(await reserve("textPro"))) return { places: [], next: null, blocked: "budget" };
+    if (!(await reserve(withWeb ? "textEnt" : "textPro"))) return { places: [], next: null, blocked: "budget" };
     const body = { textQuery, languageCode: "ja", regionCode: "JP", pageSize: 20 };
     if (ward) body.locationRestriction = { rectangle: {
       low: { latitude: ward.low[0], longitude: ward.low[1] },
@@ -124,7 +127,7 @@
     if (pageToken) body.pageToken = pageToken;
     const j = await call(API + "/places:searchText", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": KEY, "X-Goog-FieldMask": SEARCH_MASK },
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": KEY, "X-Goog-FieldMask": withWeb ? SEARCH_MASK_WEB : SEARCH_MASK },
       body: JSON.stringify(body),
     });
     const out = { places: (j.places || []).map(norm).filter(p => inWard(p.address, ward)), next: j.nextPageToken || null };
@@ -216,11 +219,14 @@
     return indexCache;
   }
 
-  /* 【管理者】区×全カテゴリを検索し、place_id と位置だけを保存（各語 最大3ページ） */
+  /* 【管理者】区×全カテゴリを検索し、place_id と位置だけを保存（各語 最大3ページ）。
+     withWebsites（既定 true）のときは公式サイトURLも受け取り、結果の sites として返す。
+     サイトURLは Google のコンテンツなので保存せず、画像抽出ツールへの受け渡しにだけ使う */
   async function collect(opts) {
     opts = opts || {};
     const wards = opts.wards || WARDS, log = opts.onLog || (() => {});
-    const items = new Map(); let calls = 0, stopped = null;
+    const withWeb = opts.withWebsites !== false;
+    const items = new Map(), sites = new Map(); let calls = 0, stopped = null;
     outer:
     for (const w of wards) {
       for (const [cat, qs] of Object.entries(QUERIES)) {
@@ -228,13 +234,14 @@
           let token = null, page = 0;
           do {
             let r;
-            try { r = await searchText(q + " " + w.name, w, token, true); }
+            try { r = await searchText(q + " " + w.name, w, token, true, withWeb); }
             catch (e) { log(`⚠️ ${w.name} / ${q}: ${e.message}`); stopped = "error"; break outer; }
             if (r.blocked) { stopped = r.blocked; log("⛔ 今月の予算上限に達したため中断しました"); break outer; }
             calls++; page++;
             r.places.forEach(p => {
               if (!items.has(p.pid) && p.lat != null)
                 items.set(p.pid, { pid: p.pid, lat: +p.lat.toFixed(6), lng: +p.lng.toFixed(6), cat, ward: w.name });
+              if (p.website && !sites.has(p.pid)) sites.set(p.pid, p.website);
             });
             log(`${w.name} / ${q}（${page}ページ目）: ${r.places.length}件`);
             token = r.next;
@@ -256,7 +263,7 @@
       }
       indexCache = null;
     }
-    return { count: list.length, calls, stopped };
+    return { count: list.length, calls, stopped, sites: [...sites].map(([pid, url]) => ({ pid, url })) };
   }
 
   const mapsLink = (pid, name) =>

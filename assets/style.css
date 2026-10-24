@@ -146,6 +146,12 @@ p.lead { color: var(--sage); margin-top: 0; }
   height: 116px; display: grid; place-items: center;
   background: linear-gradient(135deg, #efe7da 0%, #e4eadf 100%);
 }
+.place-card .thumb .imgsrc {
+  position: absolute; right: 10px; bottom: 8px; max-width: 70%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 500 10px/1.4 var(--sans); color: #fff; letter-spacing: .02em;
+  background: rgba(20, 24, 20, .45); padding: 2px 8px; border-radius: 999px;
+}
 .place-card .thumb .ph { font-size: 38px; opacity: .55; filter: grayscale(.2); }
 .place-card .thumb .badge {
   position: absolute; top: 14px; left: 14px;
