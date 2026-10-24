@@ -114,6 +114,24 @@
   }
 
   /* =======================================================================
+     Google 施設（id = "gp_<place_id>"）
+     規約上、保存してよいのは place_id のみ。店名・住所などは保存せず、
+     表示時に gplaces.js が Google から取得する。ここでは「中身の無い器」を扱う。
+     ======================================================================= */
+  const isGp = id => typeof id === "string" && id.startsWith("gp_");
+  const hints = new Map(); // id -> { category } 画面側が分かっている分類（自社の分類なので保存可）
+  Data.hintPlace = (id, meta) => { hints.set(id, Object.assign({}, hints.get(id), meta)); };
+  function gpStub(id) {
+    const h = hints.get(id) || {};
+    return {
+      id, source: "gplace", placeId: id.slice(3), name: "", address: "", desc: "",
+      category: h.category || "other", lat: null, lng: null, visibility: "public",
+      ownerId: null, ownerName: "Google", cover: "", tel: "", website: "", area: "",
+      indoorOk: null, indoorYes: 0, indoorNo: 0, checkinCount: 0, reviewCount: 0, avg: null,
+    };
+  }
+
+  /* =======================================================================
      LOCAL BACKEND (localStorage) — 端末内。データ共有なし。
      ======================================================================= */
   function localBackend() {
@@ -159,6 +177,12 @@
     async function ensureLocal(id) {
       const list = all();
       if (list.some(p => p.id === id)) return;
+      if (isGp(id)) { // Google 施設：place_id と自社分類のみ保存
+        const s = gpStub(id);
+        list.unshift({ id, source: "gplace", placeId: s.placeId, ownerId: cur ? cur.id : null, ownerName: "Google",
+          name: "", category: s.category, address: "", visibility: "public", photos: [], checkins: [], reviews: [], createdAt: Date.now() });
+        saveAll(list); return;
+      }
       const stat = (await loadStaticPlaces()).get(id);
       if (!stat) return;
       list.unshift({ id, source: "osm", ownerId: cur ? cur.id : null, ownerName: "OpenStreetMap",
@@ -185,7 +209,7 @@
       async detail(id) {
         const p = all().find(x => x.id === id);
         if (!p) {
-          const stat = (await loadStaticPlaces()).get(id);
+          const stat = (await loadStaticPlaces()).get(id) || (isGp(id) ? gpStub(id) : null);
           return stat ? { place: stat, reviews: [], photos: [], checkedInToday: false, myIndoorReport: null } : null;
         }
         const checkedInToday = (p.checkins || []).some(c => cur && c.userId === cur.id && new Date(c.at).toISOString().slice(0, 10) === today());
@@ -245,7 +269,7 @@
       async unsaveFavorite(id) { const m = read(K.SAVES, {}); const k = cur ? cur.id : "_"; m[k] = (m[k] || []).filter(x => x !== id); write(K.SAVES, m); },
       async saved() {
         const [ids, stat] = [await this.savedIds(), await loadStaticPlaces()];
-        return ids.map(id => { const p = all().find(x => x.id === id); return p ? summary(p) : stat.get(id); }).filter(Boolean);
+        return ids.map(id => { const p = all().find(x => x.id === id); return p ? summary(p) : (stat.get(id) || (isGp(id) ? gpStub(id) : null)); }).filter(Boolean);
       },
 
       async myStats() {
@@ -314,7 +338,7 @@
     };
 
     const summary = (id, d) => ({
-      id, name: d.name, category: d.category, address: d.address, desc: d.desc,
+      id, name: d.name || "", category: d.category, address: d.address || "", desc: d.desc,
       lat: d.lat ?? null, lng: d.lng ?? null, visibility: d.visibility, source: d.source,
       ownerId: d.ownerId, ownerName: d.ownerName, cover: d.cover || "", placeId: d.placeId || "",
       tel: d.tel || "", website: d.website || "", indoorOk: effIndoor(d), area: d.area || "",
@@ -325,6 +349,17 @@
 
     /* 静的(OSM)スポットを、初回の口コミ/チェックイン時に Firestore へ「昇格」させる */
     async function ensurePlaceDoc(id) {
+      if (isGp(id)) { // Google 施設：place_id と自社分類だけの器を作る（店名・住所等は保存しない）
+        try { const d = await db.collection("places").doc(id).get(); if (d.exists) return; } catch (e) { /* 未作成 */ }
+        const s = gpStub(id);
+        await db.collection("places").doc(id).set({
+          source: "gplace", placeId: s.placeId, ownerId: cur.id, ownerName: "Google",
+          category: s.category, visibility: "public",
+          checkinCount: 0, reviewCount: 0, ratingSum: 0,
+          createdAt: FS.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return;
+      }
       const stat = (await loadStaticPlaces()).get(id);
       if (!stat) return; // 静的データ由来でなければ既存doc前提
       try { await db.collection("places").doc(id).get(); return; } // 取得できれば作成済み
@@ -374,8 +409,8 @@
         let doc = null;
         try { doc = await ref.get(); } catch (e) { doc = null; }
         if (!doc || !doc.exists) {
-          // Firestore 未昇格の静的(OSM)スポット → 読み取り消費ゼロで表示
-          const stat = (await loadStaticPlaces()).get(id);
+          // Firestore 未昇格の静的(OSM)スポット／Google 施設 → 読み取り消費ゼロで表示
+          const stat = (await loadStaticPlaces()).get(id) || (isGp(id) ? gpStub(id) : null);
           return stat ? { place: stat, reviews: [], photos: [], checkedInToday: false, myIndoorReport: null } : null;
         }
         const [rev, pho, chk, rep] = await Promise.all([
@@ -494,7 +529,7 @@
         for (const id of ids) {
           try { const doc = await db.collection("places").doc(id).get(); if (doc.exists) { out.push(summary(doc.id, doc.data())); continue; } }
           catch (e) { /* 未昇格の静的スポット */ }
-          const s = stat.get(id); if (s) out.push(s);
+          const s = stat.get(id) || (isGp(id) ? gpStub(id) : null); if (s) out.push(s);
         }
         return out;
       },

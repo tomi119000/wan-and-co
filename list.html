@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット一覧 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20261024b">
+<link rel="stylesheet" href="assets/style.css?v=20261024c">
 </head>
 <body>
   <div class="app">
@@ -41,13 +41,15 @@
         <span class="sans" style="font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap" id="count"></span>
       </h2>
       <div id="cards"></div>
+      <div id="gsection"></div>
     </div>
   </div>
 
-<script src="assets/config.js?v=20261024b"></script>
-<script src="assets/data.js?v=20261024b"></script>
-<script src="assets/maps.js?v=20261024b"></script>
-<script src="assets/app.js?v=20261024b"></script>
+<script src="assets/config.js?v=20261024c"></script>
+<script src="assets/data.js?v=20261024c"></script>
+<script src="assets/maps.js?v=20261024c"></script>
+<script src="assets/gplaces.js?v=20261024c"></script>
+<script src="assets/app.js?v=20261024c"></script>
 <script>
   let activeCat = "all", q = "", area = "all", indoorOnly = false, places = [];
 
@@ -91,6 +93,7 @@
     );
     $("#count").textContent = `${list.length.toLocaleString()}件のスポット`;
     const cards = $("#cards");
+    renderGoogle();
     if (!list.length) {
       cards.innerHTML = indoorOnly
         ? `<div class="empty"><div class="big">🐕</div>この条件で「店内同伴OK」が確認できたスポットはまだありません。<br>絞り込みを解除するか、別のエリア・カテゴリをお試しください。</div>`
@@ -102,6 +105,50 @@
       a.href = `place.html?id=${p.id}`; a.className = "card place-card"; a.style.marginBottom="16px"; a.style.display="block";
       a.innerHTML = placeCardHTML(p);
       return a;
+    }));
+  }
+
+  /* ---- Google に掲載の施設（区＋カテゴリを選んだときだけ、表示時に取得） ---- */
+  let gTurn = 0;
+  const gHint = msg => `<div class="card pad sans" style="margin-top:24px;font-size:13.5px;color:var(--sage);box-shadow:none">
+      <b style="color:var(--forest)">Googleの施設も探せます</b><br>${msg}</div>`;
+  async function renderGoogle() {
+    const box = $("#gsection"), turn = ++gTurn;
+    box.innerHTML = "";
+    if (!(window.GPlaces && GPlaces.enabled) || indoorOnly) return;
+    const a = AREAS.find(x => x.key === area);
+    const ward = a && a.ward ? GPlaces.wardByName(a.ward) : null;
+    if (!ward) { box.innerHTML = gHint("エリアで「港区」「渋谷区」「目黒区」などの区を選ぶと、Googleに掲載されている施設も一覧に表示されます。"); return; }
+    if (!GPlaces.QUERIES[activeCat]) { box.innerHTML = gHint("カテゴリ（カフェ・動物病院・公園・サロン・スクール など）を選ぶと、Googleに掲載されている施設も表示されます。"); return; }
+
+    box.innerHTML = `<div class="eyebrow" style="margin-top:30px">From Google</div>
+      <h2 class="section" style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+        <span>${ward.name}の${escapeHtml(catLabel(activeCat))}</span>
+        <span class="sans" style="font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap" id="gcount"></span></h2>
+      <div id="gcards"><div class="empty">Google から読み込み中…</div></div>
+      <p class="sans" style="font-size:11.5px;color:var(--muted);margin:8px 2px 0">施設情報の一部は Google Maps から表示しています。</p>`;
+    const r = await GPlaces.searchCategory(activeCat, ward);
+    if (turn !== gTurn) return; // 条件が変わっていたら破棄
+    const ownIds = new Set(places.map(p => p.id));
+    let list = r.places.filter(g => !ownIds.has("gp_" + g.pid)).map(g => ({
+      id: "gp_" + g.pid, source: "gplace", placeId: g.pid, name: g.name, address: g.address,
+      category: activeCat, lat: g.lat, lng: g.lng, cover: "", checkinCount: 0, avg: null, visibility: "public",
+    }));
+    if (q) list = list.filter(p => (p.name + " " + p.address).toLowerCase().includes(q));
+    $("#gcount").textContent = `${list.length}件`;
+    const gcards = $("#gcards");
+    if (!list.length) {
+      gcards.innerHTML = `<div class="empty">${r.blocked === "budget"
+        ? "今月のGoogle検索の上限に達したため、来月まで表示を停止しています。"
+        : (r.blocked ? "Google から取得できませんでした。" : "該当する施設が見つかりませんでした。")}</div>`;
+      return;
+    }
+    renderCardsChunked(gcards, list.map(p => () => {
+      const el = document.createElement("a");
+      el.href = `place.html?id=${encodeURIComponent(p.id)}&cat=${p.category}`;
+      el.className = "card place-card"; el.style.marginBottom = "16px"; el.style.display = "block";
+      el.innerHTML = placeCardHTML(p);
+      return el;
     }));
   }
   mountNav("list");

@@ -17,6 +17,23 @@ window.WC_CONFIG = {
   // 元のキー: "AIzaSyBYSrIit3f_fdb5-hf4ba8NGreEbY97RrI"
   GOOGLE_MAPS_API_KEY: "",
 
+  /* ---------------------------------------------------------
+     Google Places API (New) — 施設情報の取得専用（地図表示は無料のOSMのまま）
+     ・保存するのは place_id と位置（30日以内に更新）だけ。店名などは表示時に取得
+     ・下の PLACES_BUDGET（月間回数）に達すると、アプリが自動で呼び出しを止める
+       （各SKUの無料枠より少なめに設定 → 通常は ¥0）
+     ・空文字にすると Google 連携を完全停止
+     --------------------------------------------------------- */
+  GOOGLE_PLACES_API_KEY: "AIzaSyBYSrIit3f_fdb5-hf4ba8NGreEbY97RrI",
+  PLACES_BUDGET: {
+    textPro: 4000,      // Text Search Pro（無料 5,000/月）
+    detailsPro: 4000,   // Place Details Pro：店名・住所（無料 5,000/月）
+    detailsAtmos: 800,  // Place Details Enterprise+Atmosphere：電話・口コミ・犬同伴可など（無料 1,000/月）
+    photo: 800,         // Place Photos（無料 1,000/月）
+  },
+  // 管理者（Google施設インデックスの月次更新ができる人）。アプリのログインメールアドレス
+  ADMIN_EMAILS: ["tomi119000@gmail.com"],
+
   // 地図の初期表示位置（東京・中心部）
   DEFAULT_CENTER: { lat: 35.6720, lng: 139.7100 },
   DEFAULT_ZOOM: 13,

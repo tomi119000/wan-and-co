@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20261024b">
+<link rel="stylesheet" href="assets/style.css?v=20261024c">
 </head>
 <body>
   <div class="app">
@@ -38,15 +38,17 @@
     <div class="pad">
       <div class="eyebrow">NEARBY</div>
       <h2 class="section">近くのスポット <span class="sans" style="font-size:14px;color:var(--muted)" id="count"></span></h2>
+      <div id="gnote"></div>
       <div id="cards"></div>
     </div>
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20261024b"></script>
-<script src="assets/data.js?v=20261024b"></script>
-<script src="assets/maps.js?v=20261024b"></script>
-<script src="assets/app.js?v=20261024b"></script>
+<script src="assets/config.js?v=20261024c"></script>
+<script src="assets/data.js?v=20261024c"></script>
+<script src="assets/maps.js?v=20261024c"></script>
+<script src="assets/gplaces.js?v=20261024c"></script>
+<script src="assets/app.js?v=20261024c"></script>
 <script>
   let activeCat = "all", indoorOnly = false, map = null, places = [];
 
@@ -75,6 +77,14 @@
     if (!user) { location.href = "index.html"; return; }
     $("#cards").innerHTML = `<div class="empty"><div class="big">🐾</div>読み込み中…</div>`;
     try { places = await Store.visible(); } catch (e) { places = []; toast("データの取得に失敗しました。"); }
+    // Google 施設の月次インデックス（place_id＋位置のみ・30日以内のものだけ有効）
+    if (window.GPlaces && GPlaces.enabled) {
+      GPlaces.loadIndex().then(ix => {
+        const own = new Set(places.map(p => p.id));
+        gIndex = ix.items.filter(it => !own.has("gp_" + it.pid));
+        render();
+      }).catch(() => {});
+    }
     WCMap.ready().then(() => {
       map = WCMap.create("map", { interactive: true });
       render();
@@ -204,7 +214,31 @@
       });
     }
     addFindMarkers(); // 発見マーカー（黒ピン）を base マーカーの上に重ねる
+    addGoogleMarkers();
     renderCards();
+  }
+
+  /* Google 施設のピン（濃色）。店名はタップしたときだけ取得（予算内） */
+  let gIndex = [];
+  const gInView = () => gIndex.filter(it =>
+    (activeCat === "all" || it.cat === activeCat) && !indoorOnly && inView(it.lat, it.lng));
+  function addGoogleMarkers() {
+    if (!map || !gIndex.length) return;
+    gInView().forEach(it => {
+      const href = `place.html?id=gp_${encodeURIComponent(it.pid)}&cat=${it.cat}`;
+      const mk = map.addMarker({ lat: it.lat, lng: it.lng }, {
+        pin: "find", title: catLabel(it.cat),
+        html: `<span class="sans" style="font-size:12px;color:#7a8075">${catLabel(it.cat)}・Google</span><br><b>読み込み中…</b>`,
+        onClick: async () => {
+          const d = await GPlaces.details(it.pid, "basic").catch(() => null);
+          const name = d && d.name ? escapeHtml(d.name) : "Googleの施設";
+          const addr = d && d.address ? `<br><span style="font-size:12px;color:#7a8075">${escapeHtml(areaSummary(d.address))}</span>` : "";
+          if (mk && mk.setPopupContent) mk.setPopupContent(
+            `<span class="sans" style="font-size:12px;color:#7a8075">${catLabel(it.cat)}・Google</span><br><b>${name}</b>${addr}<br>
+             <a href="${href}" style="color:#c96542">詳細を見る →</a>`);
+        },
+      });
+    });
   }
 
   // 「近くのスポット」は、地図に表示されている範囲（＝ピンが見える範囲）の施設だけを表示
@@ -213,6 +247,11 @@
     const disc = filteredDiscovery().filter(({ g }) => inView(g.lat, g.lng));
     $("#count").textContent = `（${reg.length + disc.length}件）`;
     const cards = $("#cards");
+    // Google 施設は一覧に並べず件数だけ案内（店名の取得コストを抑えるため）
+    const gn = gIndex.length ? gInView().length : 0;
+    $("#gnote").innerHTML = gn ? `<div class="card pad sans" style="margin:0 0 16px;box-shadow:none;font-size:13.5px;color:var(--sage)">
+        <b style="color:var(--forest)">Googleに掲載の施設が ${gn}件</b> この範囲にあります。<br>
+        地図の濃い色のピンをタップするか、「さがす」で区とカテゴリを選ぶと一覧で見られます。</div>` : "";
     if (!reg.length && !disc.length) {
       cards.innerHTML = indoorOnly
         ? `<div class="empty"><div class="big">🐕</div>この範囲で「店内同伴OK」が確認できたスポットはありません。<br>地図を動かすか、絞り込みを解除してください。</div>`

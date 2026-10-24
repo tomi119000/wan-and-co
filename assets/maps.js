@@ -206,7 +206,7 @@
         center() { const c = map.getCenter(); return { lat: c.lat, lng: c.lng }; },
         addMarker(pos, o = {}) {
           const mk = L.marker([pos.lat, pos.lng], { icon: o.pin === "find" ? iconFind : icon }).addTo(map);
-          if (o.html) mk.bindPopup(o.html);
+          if (o.html) mk.bindPopup(o.html, { autoPan: false }); // 自動パン→再描画でポップアップが閉じるのを防ぐ
           if (o.onClick) mk.on("click", o.onClick);
           markers.push(mk); return mk;
         },

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>管理 — Wan &amp; Co.</title>
+<link rel="stylesheet" href="assets/style.css?v=20261024c">
+<style>
+  .row { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-top:1px solid var(--line); font-size:14px; }
+  .row:first-child { border-top:none; }
+  .bar { height:6px; border-radius:99px; background:var(--sand); overflow:hidden; margin-top:4px; }
+  .bar i { display:block; height:100%; background:var(--forest); }
+  .bar i.warn { background:var(--terracotta); }
+  #log { font-family: ui-monospace, Menlo, monospace; font-size:12px; white-space:pre-wrap; max-height:260px; overflow:auto;
+         background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:12px; margin-top:12px; }
+  .wards { display:flex; flex-wrap:wrap; gap:8px; }
+  .wards label { display:inline-flex; align-items:center; gap:6px; font-size:14px; padding:8px 14px;
+                 border:1px solid var(--line); border-radius:999px; background:var(--paper); cursor:pointer; }
+  .wards input { width:auto; box-shadow:none; -webkit-appearance:checkbox; appearance:auto; padding:0; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a href="mypage.html" class="backlink">‹ マイページ</a>
+      <div class="sub">Admin</div>
+    </header>
+
+    <div class="pad" id="root"><div class="empty">読み込み中…</div></div>
+  </div>
+
+<script src="assets/config.js?v=20261024c"></script>
+<script src="assets/data.js?v=20261024c"></script>
+<script src="assets/gplaces.js?v=20261024c"></script>
+<script src="assets/app.js?v=20261024c"></script>
+<script>
+  const SKU_LABEL = {
+    textPro:      ["Text Search Pro（検索）", 5000],
+    detailsPro:   ["Place Details Pro（店名・住所）", 5000],
+    detailsAtmos: ["Place Details Ent.+Atmosphere（電話・口コミ等）", 1000],
+    photo:        ["Place Photos（写真）", 1000],
+  };
+
+  (async () => {
+    const user = await Data.ready();
+    if (!user) { location.href = "index.html"; return; }
+    const admins = (WC_CONFIG.ADMIN_EMAILS || []).map(s => s.toLowerCase());
+    if (!admins.includes(String(user.email || "").toLowerCase())) {
+      $("#root").innerHTML = `<div class="empty"><div class="big">🔒</div>このページは管理者専用です。</div>`;
+      return;
+    }
+    await render();
+    mountNav("my");
+  })();
+
+  async function render() {
+    const [ix, u] = await Promise.all([GPlaces.loadIndex(), GPlaces.usage()]);
+    const totalQueries = Object.values(GPlaces.QUERIES).reduce((n, a) => n + a.length, 0);
+    const updated = ix.updatedAt ? new Date(ix.updatedAt).toLocaleString("ja-JP") : "未実行";
+    const age = isFinite(ix.ageDays) ? Math.floor(ix.ageDays) : null;
+    const status = age == null ? "まだ一度も更新されていません"
+      : age > 30 ? "⚠️ 30日を超えたため、地図のGoogleピンは非表示です（規約上の位置情報の保存期限）"
+      : age > 25 ? "まもなく30日になります。更新してください" : "有効";
+
+    $("#root").innerHTML = `
+      <div class="eyebrow">Google Places</div>
+      <h2 class="section">Google施設インデックス</h2>
+      <div class="card pad" style="margin-bottom:18px">
+        <div class="row"><span>最終更新</span><b>${updated}</b></div>
+        <div class="row"><span>経過日数</span><b>${age == null ? "–" : age + "日"}</b></div>
+        <div class="row"><span>登録件数（place_id＋位置）</span><b>${ix.total.toLocaleString()}件</b></div>
+        <div class="row"><span>状態</span><span style="text-align:right">${status}</span></div>
+      </div>
+
+      <h3 class="section" style="font-size:18px">今月の利用回数（${u.month.slice(0,4)}年${+u.month.slice(4)}月）</h3>
+      <div class="card pad sans" style="margin-bottom:18px">
+        ${Object.entries(SKU_LABEL).map(([k, [label, free]]) => {
+          const used = u.counts[k] || 0, budget = u.budget[k];
+          const pct = Math.min(100, Math.round(used / budget * 100));
+          return `<div class="row" style="display:block">
+            <div style="display:flex;justify-content:space-between"><span>${label}</span><b>${used.toLocaleString()} / ${budget.toLocaleString()}</b></div>
+            <div class="bar"><i class="${pct >= 80 ? "warn" : ""}" style="width:${pct}%"></i></div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:3px">Googleの無料枠 ${free.toLocaleString()}回/月。アプリの上限 ${budget.toLocaleString()}回で自動停止します。</div>
+          </div>`;
+        }).join("")}
+      </div>
+
+      <h3 class="section" style="font-size:18px">月次更新を実行</h3>
+      <p class="sans" style="font-size:13.5px;color:var(--sage);margin-top:0">
+        選んだ区 × ${totalQueries}種類の検索語で検索し、<b>place_id と位置だけ</b>を保存します（店名などは保存しません）。
+        位置情報の保存期限が30日のため、<b>4週間ごと</b>に実行してください。
+        チェックを外した区のデータは削除されます（通常は全区を選んだまま実行）。
+      </p>
+      <div class="wards" id="wards">
+        ${GPlaces.WARDS.map(w => `<label><input type="checkbox" value="${w.name}" checked> ${w.name}</label>`).join("")}
+      </div>
+      <p class="sans" id="estimate" style="font-size:13px;color:var(--muted)"></p>
+      <button class="btn btn-gold" id="run">インデックスを更新する</button>
+      <div id="log" hidden></div>`;
+
+    const est = () => {
+      const n = $$("#wards input:checked").length;
+      $("#estimate").textContent = `検索回数の目安：${(n * totalQueries).toLocaleString()}〜${(n * totalQueries * 3).toLocaleString()}回（Text Search Pro）`;
+    };
+    $$("#wards input").forEach(c => c.onchange = est); est();
+
+    $("#run").onclick = async () => {
+      const names = $$("#wards input:checked").map(c => c.value);
+      if (!names.length) return toast("区を選んでください。");
+      if (!confirm(`${names.join("・")} のインデックスを更新します。よろしいですか？`)) return;
+      const btn = $("#run"); btn.disabled = true; btn.textContent = "更新中…";
+      const log = $("#log"); log.hidden = false; log.textContent = "";
+      const write = s => { log.textContent += s + "\n"; log.scrollTop = log.scrollHeight; };
+      try {
+        const r = await GPlaces.collect({ wards: GPlaces.WARDS.filter(w => names.includes(w.name)), onLog: write });
+        write(`\n✅ 完了：${r.count}件を保存（検索 ${r.calls}回）${r.stopped ? "（途中で停止：" + r.stopped + "）" : ""}`);
+        toast("インデックスを更新しました。");
+      } catch (e) { write("❌ エラー：" + e.message); }
+      btn.disabled = false; btn.textContent = "インデックスを更新する";
+    };
+  }
+</script>
+</body>
+</html>

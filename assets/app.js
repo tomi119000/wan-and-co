@@ -28,7 +28,7 @@ const CATEGORIES = [
   { key: "hotel",  label: "宿泊",       icon: "🛎" },
   { key: "park",   label: "公園",       icon: "🌳" },
   { key: "shop",   label: "ショップ",    icon: "🛍" },
-  { key: "school", label: "スクール",    icon: "🎓" },  // ドッグトレーニング・しつけ
+  { key: "school", label: "スクール・幼稚園", icon: "🎓" },  // ドッグトレーニング・しつけ・犬の幼稚園
   { key: "salon",  label: "サロン",     icon: "✂️" },  // トリミング
   { key: "clinic", label: "動物病院",   icon: "🏥" },
   { key: "daycare",  label: "一時預かり", icon: "🏠" },
@@ -38,7 +38,7 @@ const CATEGORIES = [
   { key: "other",  label: "その他",     icon: "✦" },
 ];
 const catLabel = k => (CATEGORIES.find(c => c.key === k) || {}).label || "その他";
-const sourceLabel = s => s === "user" ? "ユーザー登録" : (s === "osm" ? "OpenStreetMap" : "Google Map掲載");
+const sourceLabel = s => s === "user" ? "ユーザー登録" : (s === "osm" ? "OpenStreetMap" : (s === "gplace" ? "Google" : "Google Map掲載"));
 
 /* 住所から所在地概要を抽出（例: "〒150-0001 東京都渋谷区神宮前３丁目…" → "東京都渋谷区神宮前３丁目"） */
 function areaSummary(addr) {
@@ -50,10 +50,19 @@ function areaSummary(addr) {
   return s.replace(/[0-9０-９].*$/, "").trim();                     // 番地以降を除去
 }
 
-/* 主要エリア（スポット画面のエリア絞り込み用・中心座標＋半径km） */
+/* 主要エリア（スポット画面のエリア絞り込み用）
+   ward: 区単位（住所の区名で判定。Google 施設の表示対象）／ lat,lng,r: 中心座標＋半径km */
 const AREAS = [
   { key: "all",        label: "すべてのエリア" },
-  { key: "minato",     label: "港区（南青山・白金・六本木）", lat: 35.658, lng: 139.732, r: 2.6 },
+  { key: "w_minato",   label: "港区",     ward: "港区" },
+  { key: "w_shibuya",  label: "渋谷区",   ward: "渋谷区" },
+  { key: "w_meguro",   label: "目黒区",   ward: "目黒区" },
+  { key: "w_bunkyo",   label: "文京区",   ward: "文京区" },
+  { key: "w_setagaya", label: "世田谷区", ward: "世田谷区" },
+  { key: "w_chiyoda",  label: "千代田区", ward: "千代田区" },
+  { key: "w_chuo",     label: "中央区",   ward: "中央区" },
+  { key: "w_shinjuku", label: "新宿区",   ward: "新宿区" },
+  { key: "w_shinagawa",label: "品川区",   ward: "品川区" },
   { key: "shibuya",    label: "渋谷・原宿・代官山",         lat: 35.661, lng: 139.703, r: 2.2 },
   { key: "ebisu",      label: "恵比寿・中目黒",            lat: 35.646, lng: 139.708, r: 2.0 },
   { key: "futako",     label: "二子玉川",                lat: 35.611, lng: 139.626, r: 2.2 },
@@ -72,6 +81,7 @@ function distKm(a, b, c, d) {
 function inArea(p, areaKey) {
   const a = AREAS.find(x => x.key === areaKey);
   if (!a || a.key === "all") return true;
+  if (a.ward) return String(p.address || "").includes(a.ward) || (p.ward === a.ward);
   if (p.lat == null) return false;
   return distKm(a.lat, a.lng, p.lat, p.lng) <= a.r;
 }
@@ -113,8 +123,11 @@ function placeCardHTML(p, opts) {
       ${saveBtn}
     </div>
     <div class="body">
-      ${p.address ? `<div class="card-loc">${escapeHtml(areaSummary(p.address))}</div>` : ""}
-      <h3>${escapeHtml(p.name)}</h3>
+      ${p.address ? `<div class="card-loc">${escapeHtml(areaSummary(p.address))}</div>`
+        : (p.source === "gplace" ? `<div class="card-loc" data-gploc="1"></div>` : "")}
+      ${(!p.name && p.source === "gplace")
+        ? `<h3 data-gpid="${escapeHtml(p.placeId || String(p.id).slice(3))}" style="color:var(--muted)">読み込み中…</h3>`
+        : `<h3>${escapeHtml(p.name)}</h3>`}
       ${p.desc ? `<p class="card-desc">${escapeHtml(p.desc)}</p>` : ""}
       <div class="meta">
         ${p.avg ? `<span class="stars">★</span><b>${p.avg.toFixed(1)}</b><span>（${p.reviewCount || 0}件）</span>` : `<span>口コミはまだありません</span>`}
@@ -134,6 +147,24 @@ function hydrateCardPhotos(root) {
       el.removeAttribute("data-photo"); // 二重取得を防ぐ
       WCMap.fetchPhoto(pid).then(url => { if (url) el.style.backgroundImage = `url('${url}')`; }).catch(() => {});
     });
+  });
+}
+
+/* 店名を保存していない Google 施設のカードに、店名・所在地を表示時に取得して入れる（予算内のみ） */
+function hydrateGoogleNames(root) {
+  if (!(window.GPlaces && GPlaces.enabled)) return;
+  $$("h3[data-gpid]", root || document).forEach(h => {
+    const pid = h.getAttribute("data-gpid");
+    h.removeAttribute("data-gpid");
+    GPlaces.details(pid, "basic").then(d => {
+      const loc = h.parentElement && h.parentElement.querySelector('[data-gploc]');
+      if (d && d.name) {
+        h.textContent = d.name; h.style.color = "";
+        if (loc) loc.textContent = areaSummary(d.address);
+      } else {
+        h.textContent = "Googleの施設（タップで詳細）";
+      }
+    }).catch(() => { h.textContent = "Googleの施設（タップで詳細）"; });
   });
 }
 
@@ -160,6 +191,7 @@ function renderCardsChunked(container, makers, batch) {
       container.appendChild(more);
     } else { more.remove(); }
     hydrateCardPhotos(container);
+    hydrateGoogleNames(container);
     wireSaveButtons(container);
   }
   more.onclick = () => { more.remove(); step(); };

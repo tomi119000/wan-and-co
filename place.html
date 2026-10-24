@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット詳細 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20261024b">
+<link rel="stylesheet" href="assets/style.css?v=20261024c">
 </head>
 <body>
   <div class="app">
@@ -15,12 +15,16 @@
     <div id="content"></div>
   </div>
 
-<script src="assets/config.js?v=20261024b"></script>
-<script src="assets/data.js?v=20261024b"></script>
-<script src="assets/maps.js?v=20261024b"></script>
-<script src="assets/app.js?v=20261024b"></script>
+<script src="assets/config.js?v=20261024c"></script>
+<script src="assets/data.js?v=20261024c"></script>
+<script src="assets/maps.js?v=20261024c"></script>
+<script src="assets/gplaces.js?v=20261024c"></script>
+<script src="assets/app.js?v=20261024c"></script>
 <script>
-  const id = new URLSearchParams(location.search).get("id");
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id");
+  // 一覧から来た Google 施設は、自社の分類（カテゴリ）を引き継ぐ
+  if (id && id.startsWith("gp_") && params.get("cat")) Data.hintPlace(id, { category: params.get("cat") });
 
   (async () => {
     const user = await Data.ready();
@@ -49,9 +53,9 @@
       ${hero ? `<img class="hero-img" src="${hero}" alt="">` : `<div class="hero-img" id="heroBox" style="background:#ded9cf center/cover no-repeat"></div>`}
       <div class="pad">
         <div class="eyebrow">${catLabel(p.category)}${p.visibility==="private"?" ・ 🔒非公開":""}</div>
-        <h2 class="section" style="margin-bottom:8px">${escapeHtml(p.name)}</h2>
-        <p class="sans" style="color:var(--muted);margin-top:0">📍 ${escapeHtml(p.address || "住所未登録")}</p>
-        <div class="sans" style="display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 4px;font-size:14px">
+        <h2 class="section" id="pName" style="margin-bottom:8px">${escapeHtml(p.name || "読み込み中…")}</h2>
+        <p class="sans" id="pAddr" style="color:var(--muted);margin-top:0">📍 ${escapeHtml(p.address || (p.source === "gplace" ? "" : "住所未登録"))}</p>
+        <div class="sans" id="pChips" style="display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 4px;font-size:14px">
           ${p.indoorOk === true ? `<span style="background:#e8f0e9;color:var(--ok);padding:5px 12px;border-radius:999px;font-weight:600">🐕 店内同伴OK</span>` : ""}
           ${p.indoorOk === false ? `<span style="background:#f3ece9;color:var(--danger);padding:5px 12px;border-radius:999px">店内同伴は不可（テラス等）</span>` : ""}
           ${p.tel ? `<a href="tel:${escapeHtml(p.tel)}" style="background:var(--paper-2);border:1px solid var(--line);color:var(--ink);padding:5px 12px;border-radius:999px;text-decoration:none">📞 ${escapeHtml(p.tel)}</a>` : ""}
@@ -65,6 +69,7 @@
         </div>
 
         ${p.desc ? `<p>${escapeHtml(p.desc)}</p>` : ""}
+        <div id="gExtra"></div>
 
         <button class="btn btn-gold" id="checkin" style="margin:8px 0 6px" ${d.checkedInToday?"disabled style='opacity:.6'":""}>
           ${d.checkedInToday ? "✓ 本日チェックイン済み" : "✓ ここにチェックインする"}
@@ -114,18 +119,9 @@
         <div id="reviews"></div>
       </div>`;
 
-    // hero 写真が無い取り込み施設は Places API から後埋め
-    if (!hero && p.placeId && window.WCMap && WCMap.ready) {
-      WCMap.ready().then(() => WCMap.fetchPhoto && WCMap.fetchPhoto(p.placeId)).then(url => {
-        const hb = document.getElementById("heroBox"); if (hb && url) hb.style.backgroundImage = `url('${url}')`;
-      }).catch(() => {});
-    }
-
-    // Google の口コミ（ワンちゃん関連を優先・投稿日付き）
-    if (p.placeId && window.WCMap && WCMap.ready) {
-      WCMap.ready().then(() => WCMap.fetchReviews && WCMap.fetchReviews(p.placeId))
-        .then(rv => renderGoogleReviews(rv || [])).catch(() => {});
-    }
+    // Google 施設：写真・電話・サイト・評価・営業時間・犬同伴可・口コミを、開いたときに取得（予算内）
+    const gpid = p.placeId || (String(id).startsWith("gp_") ? String(id).slice(3) : "");
+    if (gpid && window.GPlaces && GPlaces.enabled) enrichFromGoogle(gpid, p, !!hero);
 
     // mini map (content was re-rendered, so #mini is a fresh node)
     if (p.lat != null) {
@@ -201,6 +197,68 @@
         sb.disabled = false;
       };
     }
+  }
+
+  /* Google から表示用の情報を取得して差し込む（保存はしない） */
+  const chip = (html, extra) => `<span style="background:var(--paper-2);border:1px solid var(--line);color:var(--ink);padding:5px 12px;border-radius:999px;${extra||""}">${html}</span>`;
+  async function enrichFromGoogle(gpid, p, hasHero) {
+    let g = null;
+    try { g = await GPlaces.details(gpid, "full"); } catch (e) { g = null; }
+    const nameEl = $("#pName"), addrEl = $("#pAddr"), chips = $("#pChips"), extra = $("#gExtra");
+    if (!nameEl) return; // 画面が再描画された
+    const link = `<a href="${GPlaces.mapsLink(gpid, (g && g.name) || p.name)}" target="_blank" rel="noopener"
+       class="btn btn-ghost" style="margin:14px 0 4px">Googleマップで見る（写真・口コミ）↗</a>`;
+    if (!g || !g.name) {
+      if (!p.name) nameEl.textContent = "Googleの施設";
+      extra.innerHTML = `<p class="sans" style="font-size:13px;color:var(--muted);margin:10px 0 0">${
+        g && g.blocked === "budget" ? "今月のGoogle情報の表示上限に達したため、詳しい情報はGoogleマップでご覧ください。"
+                                    : "Googleから情報を取得できませんでした。"}</p>${link}`;
+      return;
+    }
+    // 分類が未設定なら Google の種別から推定（自社の分類として保持してよい）
+    if (p.category === "other" && window.catFromGoogleTypes)
+      Data.hintPlace(id, { category: catFromGoogleTypes(g.types, g.primaryType, g.name) });
+    else Data.hintPlace(id, { category: p.category });
+
+    nameEl.textContent = g.name;
+    if (g.address) addrEl.textContent = "📍 " + g.address.replace(/^日本、/, "");
+    document.title = g.name + " — Wan & Co.";
+    // 位置を保存していない施設は、表示時に取得した位置でミニ地図を描く
+    if (p.lat == null && g.lat != null && $("#mini")) {
+      $("#mini").innerHTML = "";
+      WCMap.ready().then(() => {
+        const mini = WCMap.create("mini", { center: { lat: g.lat, lng: g.lng }, zoom: 15, interactive: false });
+        mini.addMarker({ lat: g.lat, lng: g.lng }, { title: g.name });
+      });
+    }
+
+    const add = [];
+    if (p.indoorOk == null && g.allowsDogs === true) add.push(chip("🐕 犬同伴可（Google情報）", "background:#e8f0e9;color:var(--ok);font-weight:600;border-color:transparent"));
+    if (p.indoorOk == null && g.allowsDogs === false) add.push(chip("犬同伴不可（Google情報）", "color:var(--danger)"));
+    if (g.rating) add.push(chip(`<span style="color:var(--terracotta)">★</span> ${g.rating.toFixed(1)}（${g.ratingCount}件・Google）`));
+    if (g.phone && !p.tel) add.push(`<a href="tel:${escapeHtml(g.phone)}" style="background:var(--paper-2);border:1px solid var(--line);color:var(--ink);padding:5px 12px;border-radius:999px;text-decoration:none">📞 ${escapeHtml(g.phone)}</a>`);
+    if (g.website && !p.website) add.push(`<a href="${escapeHtml(g.website)}" target="_blank" rel="noopener" style="background:var(--paper-2);border:1px solid var(--line);color:var(--ink);padding:5px 12px;border-radius:999px;text-decoration:none">🔗 ウェブサイト</a>`);
+    chips.insertAdjacentHTML("beforeend", add.join(""));
+
+    extra.innerHTML = `
+      ${g.hours.length ? `<details class="card pad sans" style="margin-top:14px;box-shadow:none">
+        <summary style="cursor:pointer;font-weight:700;color:var(--forest)">🕒 営業時間</summary>
+        <div style="font-size:13.5px;margin-top:8px;line-height:1.9">${g.hours.map(h => escapeHtml(h)).join("<br>")}</div></details>` : ""}
+      ${link}
+      <p class="sans" style="font-size:11px;color:var(--muted);margin:2px 0 0;text-align:center">情報提供：Google Maps</p>`;
+
+    // 写真（1枚＝1回）。自社写真が無いときだけ取得
+    if (!hasHero && g.photos.length) {
+      const url = await GPlaces.photoUrl(g.photos[0].name, 1000);
+      const hb = document.getElementById("heroBox");
+      if (url && hb) {
+        hb.style.backgroundImage = `url('${url}')`;
+        if (g.photos[0].attrs.length) hb.insertAdjacentHTML("afterend",
+          `<p class="sans" style="font-size:11px;color:var(--muted);text-align:right;margin:4px 16px 0">Photo: ${escapeHtml(g.photos[0].attrs.join(", "))}（Google）</p>`);
+      }
+    }
+    // 口コミ（ワンちゃん関連を優先・投稿日つき）
+    renderGoogleReviews(g.reviews);
   }
 
   // Google 口コミの描画（ワンちゃん関連を優先・投稿年月日つき）

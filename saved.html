@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>保存したスポット — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20261024b">
+<link rel="stylesheet" href="assets/style.css?v=20261024c">
 </head>
 <body>
   <div class="app">
@@ -23,10 +23,11 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20261024b"></script>
-<script src="assets/data.js?v=20261024b"></script>
-<script src="assets/maps.js?v=20261024b"></script>
-<script src="assets/app.js?v=20261024b"></script>
+<script src="assets/config.js?v=20261024c"></script>
+<script src="assets/data.js?v=20261024c"></script>
+<script src="assets/maps.js?v=20261024c"></script>
+<script src="assets/gplaces.js?v=20261024c"></script>
+<script src="assets/app.js?v=20261024c"></script>
 <script>
   (async () => {
     const user = await Data.ready();
@@ -54,6 +55,7 @@
       box.appendChild(a);
     });
     hydrateCardPhotos(box);
+    hydrateGoogleNames(box);
     // 保存ボタン（この画面では解除に使える）→ 解除したら再描画
     await wireSaveButtons(box);
     $$(".save-btn", box).forEach(btn => {

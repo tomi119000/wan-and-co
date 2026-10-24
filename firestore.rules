@@ -60,10 +60,25 @@ service cloud.firestore {
       allow write: if signedIn() && request.auth.uid == uid;
     }
 
-    // シード投入マーカー（ログインユーザーが1度だけ作成）
+    function isAdmin() {
+      return signedIn() && request.auth.token.email in ['tomi119000@gmail.com'];
+    }
+
+    // メタ情報（シード投入マーカー等）。Google施設インデックスは管理者のみ更新可
     match /meta/{doc} {
       allow read: if true;
-      allow write: if signedIn();
+      allow write: if signedIn() && (doc != 'googlePlaces' || isAdmin());
+    }
+
+    // Google API の月間利用回数（予算ガード）。カウンタは増やす方向のみ許可
+    match /usage/{month} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn()
+        && request.resource.data.get('textPro', 0)      >= resource.data.get('textPro', 0)
+        && request.resource.data.get('detailsPro', 0)   >= resource.data.get('detailsPro', 0)
+        && request.resource.data.get('detailsAtmos', 0) >= resource.data.get('detailsAtmos', 0)
+        && request.resource.data.get('photo', 0)        >= resource.data.get('photo', 0);
     }
   }
 }

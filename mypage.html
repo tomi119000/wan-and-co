@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マイページ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20261024b">
+<link rel="stylesheet" href="assets/style.css?v=20261024c">
 </head>
 <body>
   <div class="app">
@@ -40,9 +40,9 @@
     </div>
   </div>
 
-<script src="assets/config.js?v=20261024b"></script>
-<script src="assets/data.js?v=20261024b"></script>
-<script src="assets/app.js?v=20261024b"></script>
+<script src="assets/config.js?v=20261024c"></script>
+<script src="assets/data.js?v=20261024c"></script>
+<script src="assets/app.js?v=20261024c"></script>
 <script>
   let user = null;
   $("#logout").addEventListener("click", async () => { await Auth.logout(); location.href = "index.html"; });
@@ -53,6 +53,11 @@
     $("#av").textContent = (user.name||"?")[0];
     $("#uname").textContent = user.name;
     $("#uemail").textContent = user.email;
+    // 管理者だけに管理ページへの導線を表示
+    if ((WC_CONFIG.ADMIN_EMAILS || []).map(s => s.toLowerCase()).includes(String(user.email || "").toLowerCase())) {
+      $(".stat-row").insertAdjacentHTML("afterend",
+        `<a href="admin.html" class="btn btn-ghost" style="margin:0 0 22px">⚙️ 管理：Google施設の月次更新・利用状況</a>`);
+    }
     await render();
     mountNav("my");
   })();
