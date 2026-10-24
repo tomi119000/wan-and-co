@@ -20,17 +20,16 @@
   const key = (cfg.GOOGLE_MAPS_API_KEY || "").trim();
   const useGoogle = key.length > 0;
 
+  // ピンは登録スポット・Google施設とも同じ金色（グラデーション＋細い縁取りで地図上でも沈まないように）
   const PIN = "data:image/svg+xml;utf8," + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="46" viewBox="0 0 34 46">
-       <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z" fill="#c96542"/>
-       <circle cx="17" cy="17" r="7" fill="#fff"/>
+       <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+         <stop offset="0" stop-color="#e2c372"/><stop offset="1" stop-color="#b08a35"/></linearGradient></defs>
+       <path d="M17 1C8.2 1 1 8.2 1 17c0 11.4 16 27.6 16 27.6S33 28.4 33 17C33 8.2 25.8 1 17 1z"
+             fill="url(#g)" stroke="#8a6a24" stroke-width="1.4"/>
+       <circle cx="17" cy="17" r="6.5" fill="#fffaf0"/>
      </svg>`);
-  // Places 検索の発見マーカー（未登録の実在スポット用・ダークグレー＋肉球）
-  const PIN_FIND = "data:image/svg+xml;utf8," + encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="46" viewBox="0 0 34 46">
-       <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z" fill="#2b2f3a"/>
-       <circle cx="17" cy="17" r="7.5" fill="#d98564"/>
-     </svg>`);
+  const PIN_FIND = PIN;
 
   let readyResolve;
   const readyPromise = new Promise(r => (readyResolve = r));

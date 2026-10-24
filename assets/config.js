@@ -37,6 +37,8 @@ window.WC_CONFIG = {
   // OpenStreetMap 由来のスポットを表示するか。false でも assets/osm-data.json と
   // Firestore 上のデータは残る（true に戻せば再表示）
   SHOW_OSM_DATA: false,
+  // アプリ作成時の初期サンプル4件（青山テラス ドッグカフェ等）を表示するか。false でもデータは残る
+  SHOW_SAMPLE_DATA: false,
 
   // 地図の初期表示位置（東京・中心部）
   DEFAULT_CENTER: { lat: 35.6720, lng: 139.7100 },

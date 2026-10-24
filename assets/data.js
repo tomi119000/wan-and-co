@@ -97,7 +97,9 @@
   const OSM_DATA_URL = "assets/osm-data.json?v=20260706b";
   // false のとき OSM 由来のスポット（静的データ・Firestore昇格済みとも）を画面に出さない。データ自体は保持
   const SHOW_OSM = !!(window.WC_CONFIG && WC_CONFIG.SHOW_OSM_DATA);
-  const showable = p => SHOW_OSM || (p && p.source !== "osm");
+  // 初期サンプル（source:"google" の見本データ g1〜g4）も同様にデータは残して非表示にできる
+  const SHOW_SAMPLE = !!(window.WC_CONFIG && WC_CONFIG.SHOW_SAMPLE_DATA);
+  const showable = p => !!p && (SHOW_OSM || p.source !== "osm") && (SHOW_SAMPLE || p.source !== "google");
   let staticCache = null;
   async function loadStaticPlaces() {
     if (staticCache) return staticCache;

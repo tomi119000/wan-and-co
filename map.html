@@ -13,7 +13,7 @@
 <link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js">
 <link rel="preload" as="script" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
 <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="assets/style.css?v=20261025b">
+<link rel="stylesheet" href="assets/style.css?v=20261025c">
 </head>
 <body>
   <div class="app">
@@ -53,11 +53,11 @@
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20261025b"></script>
-<script src="assets/data.js?v=20261025b"></script>
-<script src="assets/maps.js?v=20261025b"></script>
-<script src="assets/gplaces.js?v=20261025b"></script>
-<script src="assets/app.js?v=20261025b"></script>
+<script src="assets/config.js?v=20261025c"></script>
+<script src="assets/data.js?v=20261025c"></script>
+<script src="assets/maps.js?v=20261025c"></script>
+<script src="assets/gplaces.js?v=20261025c"></script>
+<script src="assets/app.js?v=20261025c"></script>
 <script>
   let activeCat = "all", indoorOnly = false, map = null, places = [];
 
@@ -277,9 +277,9 @@
     const cards = $("#cards");
     // Google 施設は一覧に並べずピンのみ（店名の取得コストを抑えるため）
     $("#gnote").innerHTML = gn ? `<div class="card pad sans" style="margin:0 0 16px;box-shadow:none;font-size:13.5px;color:var(--sage);line-height:1.8">
-        <div style="display:flex;justify-content:space-between;gap:10px"><span><span style="color:#c96542">●</span> Wan &amp; Co. のスポット</span><b style="color:var(--forest)">${listed.toLocaleString()}件<span style="font-weight:400;color:var(--muted)">（下に一覧）</span></b></div>
-        <div style="display:flex;justify-content:space-between;gap:10px"><span><span style="color:#2b2f3a">●</span> Googleに掲載の施設</span><b style="color:var(--forest)">${gn.toLocaleString()}件<span style="font-weight:400;color:var(--muted)">（地図のピン）</span></b></div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px">Googleの施設は濃い色のピンをタップすると表示されます。一覧で見るには「さがす」で区とカテゴリを選んでください。</div></div>` : "";
+        <div style="display:flex;justify-content:space-between;gap:10px"><span><span style="color:#c9a24a">●</span> Wan &amp; Co. のスポット</span><b style="color:var(--forest)">${listed.toLocaleString()}件<span style="font-weight:400;color:var(--muted)">（下に一覧）</span></b></div>
+        <div style="display:flex;justify-content:space-between;gap:10px"><span><span style="color:#c9a24a">●</span> Googleに掲載の施設</span><b style="color:var(--forest)">${gn.toLocaleString()}件<span style="font-weight:400;color:var(--muted)">（地図のピン）</span></b></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Googleの施設は、地図のピンをタップすると店名などが表示されます。一覧で見るには「さがす」で区とカテゴリを選んでください。</div></div>` : "";
     if (!reg.length && !disc.length) {
       cards.innerHTML = indoorOnly
         ? `<div class="empty"><div class="big">🐕</div>この範囲で「店内同伴OK」が確認できたスポットはありません。<br>地図を動かすか、絞り込みを解除してください。</div>`

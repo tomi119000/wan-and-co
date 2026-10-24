@@ -8,7 +8,7 @@
   // ログイン済みの目印があれば、認証SDKの読み込みを待たずにマップへ（未ログインならマップ側でここへ戻る）
   try { if (localStorage.getItem("wc_auth_hint")) location.replace("map.html"); } catch (e) {}
 </script>
-<link rel="stylesheet" href="assets/style.css?v=20261025b">
+<link rel="stylesheet" href="assets/style.css?v=20261025c">
 </head>
 <body>
   <div class="app" style="padding-bottom:0">
@@ -44,9 +44,9 @@
   </div>
   </div>
 
-<script src="assets/config.js?v=20261025b"></script>
-<script src="assets/data.js?v=20261025b"></script>
-<script src="assets/app.js?v=20261025b"></script>
+<script src="assets/config.js?v=20261025c"></script>
+<script src="assets/data.js?v=20261025c"></script>
+<script src="assets/app.js?v=20261025c"></script>
 <script>
   // already logged in? go to map
   Data.ready().then(u => { if (u) location.href = "map.html"; });
