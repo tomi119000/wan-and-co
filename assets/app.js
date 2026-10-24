@@ -228,7 +228,7 @@ async function wireSaveButtons(root) {
   $$(".save-btn", root || document).forEach(btn => {
     const id = btn.dataset.id;
     if (id && savedSet.indexOf(id) !== -1) { btn.classList.add("saved"); btn.textContent = "♥"; }
-    btn.onclick = e => { e.preventDefault(); e.stopPropagation(); toggleSave(btn); };
+    btn.onclick = e => { e.preventDefault(); e.stopPropagation(); return toggleSave(btn); };
   });
 }
 

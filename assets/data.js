@@ -95,10 +95,14 @@
      ユーザーが口コミ・チェックインした施設だけ Firestore に昇格される。
      ======================================================================= */
   const OSM_DATA_URL = "assets/osm-data.json?v=20260706b";
+  // false のとき OSM 由来のスポット（静的データ・Firestore昇格済みとも）を画面に出さない。データ自体は保持
+  const SHOW_OSM = !!(window.WC_CONFIG && WC_CONFIG.SHOW_OSM_DATA);
+  const showable = p => SHOW_OSM || (p && p.source !== "osm");
   let staticCache = null;
   async function loadStaticPlaces() {
     if (staticCache) return staticCache;
     const map = new Map();
+    if (!SHOW_OSM) return (staticCache = map);
     try {
       const r = await fetch(OSM_DATA_URL);
       (await r.json()).forEach(p => map.set(p.id, {
@@ -198,7 +202,7 @@
         const out = new Map(stat);
         all().filter(p => p.visibility === "public" || (cur && p.ownerId === cur.id))
           .forEach(p => out.set(p.id, summary(p)));
-        return [...out.values()];
+        return [...out.values()].filter(showable);
       },
       async mine() { return all().filter(p => cur && p.ownerId === cur.id && p.source === "user").map(summary); },
       async get(id) {
@@ -269,7 +273,7 @@
       async unsaveFavorite(id) { const m = read(K.SAVES, {}); const k = cur ? cur.id : "_"; m[k] = (m[k] || []).filter(x => x !== id); write(K.SAVES, m); },
       async saved() {
         const [ids, stat] = [await this.savedIds(), await loadStaticPlaces()];
-        return ids.map(id => { const p = all().find(x => x.id === id); return p ? summary(p) : (stat.get(id) || (isGp(id) ? gpStub(id) : null)); }).filter(Boolean);
+        return ids.map(id => { const p = all().find(x => x.id === id); return p ? summary(p) : (stat.get(id) || (isGp(id) ? gpStub(id) : null)); }).filter(p => p && showable(p));
       },
 
       async myStats() {
@@ -375,6 +379,7 @@
       }, { merge: true });
     }
 
+    let savedIdsP = null;
     const Store = {
       async visible() {
         await bootstrap;
@@ -389,7 +394,7 @@
           const own = await db.collection("places").where("ownerId", "==", cur.id).get();
           own.forEach(doc => out.set(doc.id, summary(doc.id, doc.data())));
         }
-        return [...out.values()].sort((a, b) => (b.source === "user") - (a.source === "user"));
+        return [...out.values()].filter(showable).sort((a, b) => (b.source === "user") - (a.source === "user"));
       },
       async mine() {
         await bootstrap; if (!cur) return [];
@@ -508,30 +513,34 @@
       async setVisibility(id, vis) { await bootstrap; await db.collection("places").doc(id).update({ visibility: vis }); },
       async remove(id) { await bootstrap; await db.collection("places").doc(id).delete(); },
 
-      /* お気に入り（保存）: users/{uid}.savedIds に配列で保持 */
+      /* お気に入り（保存）: users/{uid}.savedIds に配列で保持。ページ内ではメモリに保持して再読込を省く */
       async savedIds() {
         await bootstrap; if (!cur) return [];
-        const u = await db.collection("users").doc(cur.id).get();
-        return (u.exists && u.data().savedIds) ? u.data().savedIds : [];
+        if (!savedIdsP) savedIdsP = db.collection("users").doc(cur.id).get()
+          .then(u => (u.exists && u.data().savedIds) ? u.data().savedIds.slice() : [])
+          .catch(e => { savedIdsP = null; throw e; });
+        return (await savedIdsP).slice();
       },
       async saveFavorite(id) {
         await bootstrap; if (!cur) return;
         await db.collection("users").doc(cur.id).set({ savedIds: FS.FieldValue.arrayUnion(id) }, { merge: true });
+        if (savedIdsP) savedIdsP = savedIdsP.then(a => a.includes(id) ? a : a.concat(id));
       },
       async unsaveFavorite(id) {
         await bootstrap; if (!cur) return;
         await db.collection("users").doc(cur.id).set({ savedIds: FS.FieldValue.arrayRemove(id) }, { merge: true });
+        if (savedIdsP) savedIdsP = savedIdsP.then(a => a.filter(x => x !== id));
       },
       async saved() {
         await bootstrap; if (!cur) return [];
         const [ids, stat] = await Promise.all([this.savedIds(), loadStaticPlaces()]);
-        const out = [];
-        for (const id of ids) {
-          try { const doc = await db.collection("places").doc(id).get(); if (doc.exists) { out.push(summary(doc.id, doc.data())); continue; } }
-          catch (e) { /* 未昇格の静的スポット */ }
-          const s = stat.get(id) || (isGp(id) ? gpStub(id) : null); if (s) out.push(s);
-        }
-        return out;
+        const docs = await Promise.all(ids.map(id =>
+          db.collection("places").doc(id).get().catch(() => null))); // 未作成のdocは permission-denied
+        return ids.map((id, i) => {
+          const doc = docs[i];
+          if (doc && doc.exists) return summary(doc.id, doc.data());
+          return stat.get(id) || (isGp(id) ? gpStub(id) : null);
+        }).filter(p => p && showable(p));
       },
 
       async myStats() {

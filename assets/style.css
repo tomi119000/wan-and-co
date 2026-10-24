@@ -272,6 +272,18 @@ input[type="file"] { display: none; }
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px;
   padding: 6px;
 }
+/* 下部ナビの上に浮かぶ「戻る」ボタン（片手で届く位置） */
+.backfab {
+  position: fixed; z-index: 31;
+  left: max(16px, calc(50% - var(--maxw) / 2 + 16px));
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 11px 18px 11px 14px; border-radius: 999px;
+  background: var(--forest); color: #fff; border: none; cursor: pointer;
+  font: 600 14px/1 "Noto Sans JP", sans-serif; letter-spacing: .04em;
+  box-shadow: var(--shadow-lg);
+}
+.backfab:active { transform: scale(.97); }
 .bottomnav a {
   text-decoration: none; text-align: center; color: var(--sage);
   font-size: 11px; font-weight: 500; padding: 7px 0 6px; border-radius: 22px;

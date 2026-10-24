@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>保存したスポット — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20261024c">
+<link rel="stylesheet" href="assets/style.css?v=20261024d">
 </head>
 <body>
   <div class="app">
@@ -20,20 +20,28 @@
       <h2 class="section">保存したスポット <span class="sans" style="font-size:14px;color:var(--muted)" id="count"></span></h2>
       <p class="lead sans">気になるお店を保存して、あとでゆっくり確認できます。</p>
       <div id="cards"></div>
+      <div style="height:56px"></div>
     </div>
   </div>
+  <button class="backfab" id="back" aria-label="前の画面に戻る">‹ 戻る</button>
 
-<script src="assets/config.js?v=20261024c"></script>
-<script src="assets/data.js?v=20261024c"></script>
-<script src="assets/maps.js?v=20261024c"></script>
-<script src="assets/gplaces.js?v=20261024c"></script>
-<script src="assets/app.js?v=20261024c"></script>
+<script src="assets/config.js?v=20261024d"></script>
+<script src="assets/data.js?v=20261024d"></script>
+<script src="assets/gplaces.js?v=20261024d"></script>
+<script src="assets/app.js?v=20261024d"></script>
 <script>
+  mountNav("saved");
+  // 同じサイト内から来た場合は直前の画面へ、それ以外（直接開いた等）はマップへ
+  $("#back").addEventListener("click", () => {
+    const fromApp = document.referrer && new URL(document.referrer).origin === location.origin
+      && !/\/(index|signup)\.html/.test(document.referrer);
+    if (fromApp && history.length > 1) history.back(); else location.href = "map.html";
+  });
+
   (async () => {
     const user = await Data.ready();
     if (!user) { location.href = "index.html"; return; }
     await render();
-    mountNav("saved");
   })();
 
   async function render() {
@@ -54,13 +62,19 @@
       a.innerHTML = placeCardHTML(p);
       box.appendChild(a);
     });
-    hydrateCardPhotos(box);
     hydrateGoogleNames(box);
-    // 保存ボタン（この画面では解除に使える）→ 解除したら再描画
+    // 保存ボタン（この画面では解除に使える）→ 解除したカードだけ消す（全体の再読み込みはしない）
     await wireSaveButtons(box);
     $$(".save-btn", box).forEach(btn => {
       const orig = btn.onclick;
-      btn.onclick = async e => { await orig(e); setTimeout(render, 400); };
+      btn.onclick = async e => {
+        await orig(e);
+        if (btn.classList.contains("saved")) return;
+        const card = btn.closest(".place-card"); if (card) card.remove();
+        const left = $$(".place-card", box).length;
+        $("#count").textContent = `（${left}件）`;
+        if (!left) render();
+      };
     });
   }
 </script>

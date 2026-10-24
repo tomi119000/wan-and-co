@@ -34,6 +34,10 @@ window.WC_CONFIG = {
   // 管理者（Google施設インデックスの月次更新ができる人）。アプリのログインメールアドレス
   ADMIN_EMAILS: ["tomi119000@gmail.com"],
 
+  // OpenStreetMap 由来のスポットを表示するか。false でも assets/osm-data.json と
+  // Firestore 上のデータは残る（true に戻せば再表示）
+  SHOW_OSM_DATA: false,
+
   // 地図の初期表示位置（東京・中心部）
   DEFAULT_CENTER: { lat: 35.6720, lng: 139.7100 },
   DEFAULT_ZOOM: 13,
