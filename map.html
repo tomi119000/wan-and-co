@@ -13,7 +13,7 @@
 <link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js">
 <link rel="preload" as="script" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
 <link rel="preload" as="style" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="assets/style.css?v=20261025a">
+<link rel="stylesheet" href="assets/style.css?v=20261025b">
 </head>
 <body>
   <div class="app">
@@ -53,11 +53,11 @@
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20261025a"></script>
-<script src="assets/data.js?v=20261025a"></script>
-<script src="assets/maps.js?v=20261025a"></script>
-<script src="assets/gplaces.js?v=20261025a"></script>
-<script src="assets/app.js?v=20261025a"></script>
+<script src="assets/config.js?v=20261025b"></script>
+<script src="assets/data.js?v=20261025b"></script>
+<script src="assets/maps.js?v=20261025b"></script>
+<script src="assets/gplaces.js?v=20261025b"></script>
+<script src="assets/app.js?v=20261025b"></script>
 <script>
   let activeCat = "all", indoorOnly = false, map = null, places = [];
 
@@ -84,7 +84,18 @@
   // 地図はログイン確認・データ取得を待たずに先に描画する（ピンは後から載せる）
   let dataLoaded = false;
   WCMap.ready().then(() => {
-    map = WCMap.create("map", { interactive: true });
+    map = WCMap.create("map", { interactive: true, radiusM: WC_CONFIG.INITIAL_RADIUS_M || 500 });
+    // 位置情報がすでに許可済みなら、確認ダイアログを出さずに現在地の周辺から表示する
+    if (map.showRadius && navigator.permissions && navigator.geolocation) {
+      navigator.permissions.query({ name: "geolocation" }).then(st => {
+        if (st.state !== "granted") return;
+        navigator.geolocation.getCurrentPosition(pos => {
+          const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          map.showRadius(here, WC_CONFIG.INITIAL_RADIUS_M || 500);
+          if (map.setYou) map.setYou(here);
+        }, () => {}, { timeout: 5000, maximumAge: 300000 });
+      }).catch(() => {});
+    }
     if (dataLoaded) render();
     if (map.onIdle) map.onIdle(() => { if (dataLoaded) render(); }); // 地図を動かすとマーカー・リストが追従
     if (WCMap.canSearch) $("#findBtn").style.display = "flex"; // Google Maps モードのみ
@@ -259,17 +270,22 @@
   function renderCards() {
     const reg = filtered().filter(p => inView(p.lat, p.lng));
     const disc = filteredDiscovery().filter(({ g }) => inView(g.lat, g.lng));
-    $("#count").textContent = `（${reg.length + disc.length}件）`;
-    const cards = $("#cards");
-    // Google 施設は一覧に並べず件数だけ案内（店名の取得コストを抑えるため）
+    // 見出しの件数＝地図上のピンの総数（登録スポット＋Google施設）。内訳を下に表示
+    const listed = reg.length + disc.length;
     const gn = gIndex.length ? gInView().length : 0;
-    $("#gnote").innerHTML = gn ? `<div class="card pad sans" style="margin:0 0 16px;box-shadow:none;font-size:13.5px;color:var(--sage)">
-        <b style="color:var(--forest)">Googleに掲載の施設が ${gn}件</b> この範囲にあります。<br>
-        地図の濃い色のピンをタップするか、「さがす」で区とカテゴリを選ぶと一覧で見られます。</div>` : "";
+    $("#count").textContent = `（${(listed + gn).toLocaleString()}件）`;
+    const cards = $("#cards");
+    // Google 施設は一覧に並べずピンのみ（店名の取得コストを抑えるため）
+    $("#gnote").innerHTML = gn ? `<div class="card pad sans" style="margin:0 0 16px;box-shadow:none;font-size:13.5px;color:var(--sage);line-height:1.8">
+        <div style="display:flex;justify-content:space-between;gap:10px"><span><span style="color:#c96542">●</span> Wan &amp; Co. のスポット</span><b style="color:var(--forest)">${listed.toLocaleString()}件<span style="font-weight:400;color:var(--muted)">（下に一覧）</span></b></div>
+        <div style="display:flex;justify-content:space-between;gap:10px"><span><span style="color:#2b2f3a">●</span> Googleに掲載の施設</span><b style="color:var(--forest)">${gn.toLocaleString()}件<span style="font-weight:400;color:var(--muted)">（地図のピン）</span></b></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Googleの施設は濃い色のピンをタップすると表示されます。一覧で見るには「さがす」で区とカテゴリを選んでください。</div></div>` : "";
     if (!reg.length && !disc.length) {
       cards.innerHTML = indoorOnly
         ? `<div class="empty"><div class="big">🐕</div>この範囲で「店内同伴OK」が確認できたスポットはありません。<br>地図を動かすか、絞り込みを解除してください。</div>`
-        : `<div class="empty"><div class="big">🐾</div>この範囲にスポットがありません。<br>地図を動かすか、上の検索をお試しください。</div>`;
+        : gn
+          ? `<div class="empty"><div class="big">🐾</div>この範囲に Wan &amp; Co. のスポットはありません。<br>Googleの施設は地図のピンから確認できます。</div>`
+          : `<div class="empty"><div class="big">🐾</div>この範囲にスポットがありません。<br>地図を動かすか、縮小してみてください。</div>`;
       return;
     }
     const makers = [
@@ -302,7 +318,7 @@
     navigator.geolocation.getCurrentPosition(
       pos => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        map.setView(loc, 15);
+        if (map.showRadius) map.showRadius(loc, WC_CONFIG.INITIAL_RADIUS_M || 500); else map.setView(loc, 15);
         map.setYou(loc);
       },
       () => toast("現在地を取得できませんでした。"),

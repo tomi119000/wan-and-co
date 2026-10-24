@@ -197,7 +197,10 @@
       const map = L.map(elId, {
         zoomControl: false, dragging: interactive, scrollWheelZoom: interactive,
         doubleClickZoom: interactive, boxZoom: interactive, keyboard: interactive, tap: interactive,
-      }).setView([(opts.center || cfg.DEFAULT_CENTER).lat, (opts.center || cfg.DEFAULT_CENTER).lng], opts.zoom || cfg.DEFAULT_ZOOM);
+      });
+      const c0 = opts.center || cfg.DEFAULT_CENTER;
+      if (opts.radiusM) map.fitBounds(L.latLng(c0.lat, c0.lng).toBounds(opts.radiusM * 2)); // 半径radiusMが収まる縮尺（画面幅に応じて自動）
+      else map.setView([c0.lat, c0.lng], opts.zoom || cfg.DEFAULT_ZOOM);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
       if (interactive) L.control.zoom({ position: "topright" }).addTo(map);
       let markers = [], you = null;
@@ -212,6 +215,7 @@
         },
         clearMarkers() { markers.forEach(m => map.removeLayer(m)); markers = []; },
         setView(pos, zoom) { map.setView([pos.lat, pos.lng], zoom || map.getZoom()); },
+        showRadius(pos, radiusM) { map.fitBounds(L.latLng(pos.lat, pos.lng).toBounds(radiusM * 2)); },
         onClick(fn) { map.on("click", e => fn({ lat: e.latlng.lat, lng: e.latlng.lng })); },
         onIdle(fn) { map.on("moveend", fn); },
         inBounds(lat, lng) { try { return map.getBounds().contains(L.latLng(lat, lng)); } catch (e) { return true; } },
