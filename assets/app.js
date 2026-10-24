@@ -93,27 +93,34 @@ function placeCardHTML(p, opts) {
   const cover = safeCover(p.cover);
   // 写真が無く placeId がある施設は、あとで Places API から写真を後埋めする（Google有効時のみ）
   const needFetch = !cover && p.placeId && GOOGLE_ON;
-  const thumbStyle = cover ? `background-image:url('${cover}')` : "background-color:#ded9cf";
+  const hasImg = !!cover || needFetch;
+  const thumbStyle = cover ? `background-image:url('${cover}')` : "";
   const fetchAttr = needFetch ? ` data-photo="${escapeHtml(p.placeId)}"` : "";
+  const catIcon = (CATEGORIES.find(c => c.key === p.category) || {}).icon || "🐾";
   const saveBtn = showSave
     ? `<button class="save-btn" data-id="${escapeHtml(p.id || "")}" data-pid="${escapeHtml(p.placeId || "")}" aria-label="保存">♡</button>`
     : "";
+  const tags = [
+    p.indoorOk === true ? `<span class="tag ok">🐕 店内同伴OK</span>` : "",
+    p.checkinCount ? `<span class="tag">✓ ${p.checkinCount} チェックイン</span>` : "",
+    `<span class="tag">${escapeHtml(sourceLabel(p.source))}</span>`,
+  ].join("");
   return `
-    <div class="thumb"${fetchAttr} style="${thumbStyle}">
+    <div class="thumb${hasImg ? "" : " noimg"}"${fetchAttr} style="${thumbStyle}">
+      ${hasImg ? "" : `<span class="ph">${catIcon}</span>`}
       <span class="badge">${catLabel(p.category)}</span>
       ${p.visibility === "private" ? `<span class="lock">🔒 非公開</span>` : ""}
       ${saveBtn}
     </div>
     <div class="body">
+      ${p.address ? `<div class="card-loc">${escapeHtml(areaSummary(p.address))}</div>` : ""}
       <h3>${escapeHtml(p.name)}</h3>
-      ${p.address ? `<div class="card-loc">📍 ${escapeHtml(areaSummary(p.address))}</div>` : ""}
       ${p.desc ? `<p class="card-desc">${escapeHtml(p.desc)}</p>` : ""}
       <div class="meta">
-        ${p.avg ? `<span class="stars">${stars(p.avg)}</span> <span>${p.avg.toFixed(1)}</span>` : `<span>口コミなし</span>`}
-        <span>📍 ${p.checkinCount || 0} チェックイン</span>
-        ${p.indoorOk === true ? `<span style="color:var(--ok);font-weight:600">🐕 店内OK</span>` : ""}
-        <span>${sourceLabel(p.source)}</span>
+        ${p.avg ? `<span class="stars">★</span><b>${p.avg.toFixed(1)}</b><span>（${p.reviewCount || 0}件）</span>` : `<span>口コミはまだありません</span>`}
       </div>
+      <div class="tags">${tags}</div>
+      <div class="more">詳しく見る <span class="arr">→</span></div>
     </div>`;
 }
 
@@ -162,12 +169,20 @@ function renderCardsChunked(container, makers, batch) {
 function mountNav(active) {
   const nav = document.createElement("nav");
   nav.className = "bottomnav";
+  const svg = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const IC = {
+    map:   svg('<path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/>'),
+    list:  svg('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
+    add:   svg('<path d="M12 5v14M5 12h14"/>'),
+    saved: svg('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
+    my:    svg('<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.6 3.9-5.5 7-5.5s5.8 1.9 7 5.5"/>'),
+  };
   nav.innerHTML = `
-    <a href="map.html" data-k="map"><span class="ic">🗺</span>マップ</a>
-    <a href="list.html" data-k="list"><span class="ic">≡</span>スポット</a>
-    <a href="add.html" class="add" data-k="add"><span class="ic">＋</span>登録</a>
-    <a href="saved.html" data-k="saved"><span class="ic">♥</span>保存</a>
-    <a href="mypage.html" data-k="my"><span class="ic">◔</span>マイページ</a>`;
+    <a href="map.html" data-k="map"><span class="ic">${IC.map}</span>マップ</a>
+    <a href="list.html" data-k="list"><span class="ic">${IC.list}</span>さがす</a>
+    <a href="add.html" class="add" data-k="add"><span class="ic">${IC.add}</span>登録</a>
+    <a href="saved.html" data-k="saved"><span class="ic">${IC.saved}</span>お気に入り</a>
+    <a href="mypage.html" data-k="my"><span class="ic">${IC.my}</span>マイページ</a>`;
   const a = nav.querySelector(`[data-k="${active}"]`);
   if (a) a.classList.add("active");
   document.body.appendChild(nav);

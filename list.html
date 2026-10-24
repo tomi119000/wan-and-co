@@ -4,39 +4,50 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>スポット一覧 — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260706d">
+<link rel="stylesheet" href="assets/style.css?v=20261024b">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand">
         <div class="mark">🐾</div>
-        <div><h1>スポット</h1><div class="sub">All places</div></div>
+        <div><h1>Wan &amp; Co.</h1><div class="sub">Find your spot</div></div>
       </div>
     </header>
 
+    <section class="hero">
+      <div class="eyebrow">Good spot, happy time</div>
+      <h2>愛犬と、<br>次の<span class="accent">休日</span>へ。</h2>
+      <p>家族の一員と過ごせる、とっておきの場所を。いつもの休日が、もっと特別になる。</p>
+    </section>
+
     <div class="pad">
       <div class="field" style="margin-bottom:12px">
-        <input type="search" id="q" placeholder="🔍 施設名・エリアで検索">
+        <input type="search" id="q" placeholder="🔍 施設名・キーワードで検索">
       </div>
-      <div class="field" style="margin-bottom:14px">
+      <div class="field" style="margin-bottom:16px">
         <select id="area">
           <!-- エリア選択肢はJSで生成 -->
         </select>
       </div>
       <div class="chips" id="cats" style="margin-bottom:12px"></div>
-      <div class="filter-row" style="margin-bottom:14px">
+      <div class="filter-row" style="margin-bottom:22px">
         <button class="toggle-chip" id="indoorOnly">🐕 店内同伴OKのみ</button>
       </div>
-      <h2 class="section" style="font-size:18px;margin:4px 0 12px">検索結果 <span class="sans" style="font-size:14px;color:var(--muted)" id="count"></span></h2>
+
+      <div class="eyebrow">Curated for you</div>
+      <h2 class="section" style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+        <span>首都圏のおすすめスポット</span>
+        <span class="sans" style="font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap" id="count"></span>
+      </h2>
       <div id="cards"></div>
     </div>
   </div>
 
-<script src="assets/config.js?v=20260706d"></script>
-<script src="assets/data.js?v=20260706d"></script>
-<script src="assets/maps.js?v=20260706d"></script>
-<script src="assets/app.js?v=20260706d"></script>
+<script src="assets/config.js?v=20261024b"></script>
+<script src="assets/data.js?v=20261024b"></script>
+<script src="assets/maps.js?v=20261024b"></script>
+<script src="assets/app.js?v=20261024b"></script>
 <script>
   let activeCat = "all", q = "", area = "all", indoorOnly = false, places = [];
 
@@ -78,7 +89,7 @@
       (!indoorOnly || p.indoorOk === true) &&
       (!q || (p.name + " " + (p.address||"")).toLowerCase().includes(q))
     );
-    $("#count").textContent = `（${list.length}件）`;
+    $("#count").textContent = `${list.length.toLocaleString()}件のスポット`;
     const cards = $("#cards");
     if (!list.length) {
       cards.innerHTML = indoorOnly

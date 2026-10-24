@@ -22,14 +22,14 @@
 
   const PIN = "data:image/svg+xml;utf8," + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="46" viewBox="0 0 34 46">
-       <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z" fill="#b48b46"/>
+       <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z" fill="#c96542"/>
        <circle cx="17" cy="17" r="7" fill="#fff"/>
      </svg>`);
   // Places 検索の発見マーカー（未登録の実在スポット用・ダークグレー＋肉球）
   const PIN_FIND = "data:image/svg+xml;utf8," + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="46" viewBox="0 0 34 46">
        <path d="M17 0C7.6 0 0 7.6 0 17c0 12 17 29 17 29s17-17 17-29C34 7.6 26.4 0 17 0z" fill="#2b2f3a"/>
-       <circle cx="17" cy="17" r="7.5" fill="#caa45f"/>
+       <circle cx="17" cy="17" r="7.5" fill="#d98564"/>
      </svg>`);
 
   let readyResolve;
@@ -79,7 +79,7 @@
           if (you) you.setMap(null);
           you = new google.maps.Marker({
             position: pos, map, title: "現在地",
-            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#caa45f", fillOpacity: 1, strokeColor: "#b48b46", strokeWeight: 3 },
+            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#d98564", fillOpacity: 1, strokeColor: "#c96542", strokeWeight: 3 },
           });
         },
       };
@@ -217,7 +217,7 @@
         inBounds(lat, lng) { try { return map.getBounds().contains(L.latLng(lat, lng)); } catch (e) { return true; } },
         setYou(pos) {
           if (you) map.removeLayer(you);
-          you = L.circleMarker([pos.lat, pos.lng], { radius: 9, color: "#b48b46", fillColor: "#caa45f", fillOpacity: .9, weight: 3 })
+          you = L.circleMarker([pos.lat, pos.lng], { radius: 9, color: "#c96542", fillColor: "#d98564", fillOpacity: .9, weight: 3 })
             .addTo(map).bindPopup("現在地");
         },
       };

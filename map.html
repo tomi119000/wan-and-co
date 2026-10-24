@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マップ — Wan &amp; Co.</title>
-<link rel="stylesheet" href="assets/style.css?v=20260706d">
+<link rel="stylesheet" href="assets/style.css?v=20261024b">
 </head>
 <body>
   <div class="app">
@@ -43,10 +43,10 @@
   </div>
   <div class="scroll-hint" id="scrollHint"><span class="chev">▾</span> 下にスクロールで一覧</div>
 
-<script src="assets/config.js?v=20260706d"></script>
-<script src="assets/data.js?v=20260706d"></script>
-<script src="assets/maps.js?v=20260706d"></script>
-<script src="assets/app.js?v=20260706d"></script>
+<script src="assets/config.js?v=20261024b"></script>
+<script src="assets/data.js?v=20261024b"></script>
+<script src="assets/maps.js?v=20261024b"></script>
+<script src="assets/app.js?v=20261024b"></script>
 <script>
   let activeCat = "all", indoorOnly = false, map = null, places = [];
 
@@ -199,7 +199,7 @@
         map.addMarker({ lat: p.lat, lng: p.lng }, {
           title: p.name,
           html: `<b>${escapeHtml(p.name)}</b><br>${catLabel(p.category)}<br>
-            <a href="place.html?id=${p.id}" style="color:#b48b46">詳細を見る →</a>`,
+            <a href="place.html?id=${p.id}" style="color:#c96542">詳細を見る →</a>`,
         });
       });
     }
